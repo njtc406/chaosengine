@@ -1,0 +1,26 @@
+syntax = "proto3";
+package actor;
+option go_package = ".;actor";
+
+message PID {
+  string Address = 1;         // 服务地址
+  string NodeUID = 2;         // 服务节点唯一标识
+  string Uid = 3;             // 服务唯一标识
+  string Name = 4;            // 服务名称
+  string ServiceUid = 5;      // 服务实例唯一标识
+  int32 State = 6;            // 服务状态(0: 退休, 1: 正常)
+}
+
+message Message {
+  int32 TypeID                        = 1; // 消息类型ID
+  string TypeName                     = 2; // 消息类型名称
+  PID Sender                          = 3; // 发送者
+  PID Receiver                        = 4; // 接收者
+  string Method                       = 5; // 调用方法
+  bytes    Request                    = 6; // 方法参数
+  string Err                          = 7; // 错误信息
+  map<string, string>   messageHeader = 8; // 消息头(额外信息)
+  bool Reply                          = 9; // 是否是回复
+  uint64 ReqID                        = 10; // 请求ID
+  bool IsRpc                          = 11; // 是否是RPC
+}

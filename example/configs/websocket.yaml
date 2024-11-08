@@ -1,0 +1,9 @@
+
+# 聊天服配置
+WSServerConf:
+  Addr: 0.0.0.0:4444
+  MaxConnNum: 100000
+  PendingWriteNum: 100
+  MaxMsgLen: 4096
+  HTTPTimeout: 60s
+

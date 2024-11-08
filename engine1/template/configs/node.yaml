@@ -1,0 +1,37 @@
+## 系统基础配置
+
+# 系统状态(debug/release)
+SystemStatus: debug
+
+# 系统缓存目录
+CachePath: ./cache/
+
+# 日志目录(基于CachePath)
+LogPath: logs
+
+# 性能监控(0表示不开启监控)
+ProfilerInterval: 10s
+
+# 日志配置
+SystemLogger:
+  # 日志文件名
+  Name: "game"
+  # 日志级别
+  Level: debug
+  # 是否打印调用文件信息
+  Caller: true
+  # 是否打印完整调用文件信息
+  FullCaller: false
+  # 是否显示日志颜色
+  Color: false
+  # 日志最大保存时间(默认15天)
+  MaxAge: 720h
+  # 日志切分周期(默认24h)
+  RotationTime: 24h
+
+# 节点信息配置(这个配置是为以后预留,目前不用改)
+NodeConf:
+  # 节点id
+  ID: 1001
+  # 节点类型
+  Type: game
