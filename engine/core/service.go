@@ -83,8 +83,8 @@ func (s *Service) Init(svc interface{}, serviceInitConf *def.ServiceInitConf, cf
 		s.goroutineNum = defaultGoroutineNum
 	}
 
-	//s.rpcHandler.Init()
-	//s.IRpcHandler = &s.rpcHandler
+	// rpc处理器
+	s.rpcHandler.Init(s)
 
 	// 初始化根模块
 	s.self = svc.(inf.IModule)
@@ -99,7 +99,6 @@ func (s *Service) Init(svc interface{}, serviceInitConf *def.ServiceInitConf, cf
 }
 
 func (s *Service) Start() error {
-	s.status = SvcStatusStarting
 	// 按理说服务都应该是单线程的被初始化,所以应该不需要这样变更状态的
 	if !atomic.CompareAndSwapInt32(&s.status, SvcStatusInit, SvcStatusStarting) {
 		return fmt.Errorf("service[%s] status[%d] has inited", s.GetName(), s.status)
@@ -292,9 +291,9 @@ func (s *Service) GetPID() *actor.PID {
 	return s.pid
 }
 
-//func (s *Service) GetRpcHandler() inf.IRpcHandler {
-//	return &s.rpcHandler
-//}
+func (s *Service) GetRpcHandler() inf.IRpcHandler {
+	return &s.rpcHandler
+}
 
 func (s *Service) GetServiceEventChannelNum() int {
 	return len(s.mailBox)
@@ -315,7 +314,7 @@ func (s *Service) OnStart() error {
 func (s *Service) OnRelease() {}
 
 func (s *Service) SetGoRoutineNum(goroutineNum int32) {
-	if s.status != SvcStatusInit { // 已经启动的不允许修改
+	if atomic.LoadInt32(&s.status) != SvcStatusInit { // 已经启动的不允许修改
 		return
 	}
 
@@ -326,4 +325,8 @@ func (s *Service) OnSetup(svc inf.IService) {
 	if svc.GetName() == "" {
 		s.name = reflect.Indirect(reflect.ValueOf(svc)).Type().Name()
 	}
+}
+
+func (s *Service) IsClosed() bool {
+	return atomic.LoadInt32(&s.status) > SvcStatusRunning
 }

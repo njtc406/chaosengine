@@ -13,7 +13,6 @@ import (
 	"github.com/njtc406/chaosengine/engine/event"
 	"github.com/njtc406/chaosengine/engine/utils/asynclib"
 	"github.com/njtc406/chaosengine/engine/utils/log"
-	"time"
 )
 
 var cluster Cluster
@@ -23,7 +22,7 @@ func GetCluster() *Cluster {
 }
 
 type Cluster struct {
-	closed bool
+	closed chan struct{}
 	// 集群配置
 	conf *config.Config
 
@@ -46,6 +45,7 @@ func (c *Cluster) Init(nodeUID string, confPath string) {
 	// 加载集群配置
 	c.initConfig(confPath)
 
+	c.closed = make(chan struct{})
 	c.eventChannel = make(chan event.IEvent, 1024)
 	c.eventProcessor = event.NewProcessor()
 	c.eventProcessor.Init(c)
@@ -68,24 +68,22 @@ func (c *Cluster) Start() {
 }
 
 func (c *Cluster) Close() {
-	c.closed = true
+	close(c.closed)
 	c.endpoints.Stop()
 	c.discovery.Close()
 }
 
 func (c *Cluster) PushEvent(ev event.IEvent) error {
-	if c.closed {
-		return nil
-	}
-	if len(c.eventChannel) == cap(c.eventChannel) {
+	select {
+	case c.eventChannel <- ev:
+	default:
 		return errdef.EventChannelIsFull
 	}
-	c.eventChannel <- ev
 	return nil
 }
 
 func (c *Cluster) run() {
-	for !c.closed {
+	for {
 		select {
 		case ev := <-c.eventChannel:
 			if ev != nil {
@@ -96,8 +94,9 @@ func (c *Cluster) run() {
 					event.ReleaseEvent(e)
 				}
 			}
-		default:
-			time.Sleep(time.Millisecond)
+		case <-c.closed:
+			log.SysLogger.Info("cluster closed")
+			return
 		}
 	}
 }

@@ -12,7 +12,7 @@ import (
 )
 
 type Repository struct {
-	mapPID      *sync.Map // 服务 [serviceUid]*Endpoint
+	mapPID      *sync.Map // 服务 [serviceUid]inf.IClient
 	mapNodeLock sync.RWMutex
 	// 快速查询表
 	mapSvcByNidAndSUid   map[string]map[string]struct{}            // [nodeUid]map[serviceUid]struct{}

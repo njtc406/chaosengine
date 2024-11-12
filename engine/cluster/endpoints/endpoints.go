@@ -134,7 +134,7 @@ func (em *EndpointManager) RemoveService(pid *actor.PID) {
 	em.repository.Remove(pid)
 }
 
-func (em *EndpointManager) GetClient(serviceUid string) *client.Client {
+func (em *EndpointManager) GetClient(serviceUid string) inf.IClient {
 	return em.repository.SelectBySvcUid(serviceUid)
 }
 

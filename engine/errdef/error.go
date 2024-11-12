@@ -13,4 +13,5 @@ var (
 	RPCCallTimeout       = errors.New("RPC call timeout")
 	ServiceNotFound      = errors.New("service not found")
 	RPCCallFailed        = errors.New("RPC call failed")
+	ParamNotMatch        = errors.New("param not match")
 )

@@ -1,6 +1,6 @@
 // Package client
 // @Title  本地服务的Client
-// @Description  本地服务的Client
+// @Description  本地服务的Client,调用时直接使用rpcHandler发往对应的service
 // @Author  yr  2024/9/3 下午4:26
 // @Update  yr  2024/9/3 下午4:26
 package client
@@ -23,18 +23,18 @@ type LClient struct {
 	Client
 }
 
-func NewLClient(pid *actor.PID, monitor inf.IMonitor, rpcHandler inf.IRpcHandler) inf.IClient {
+func NewLClient(pid *actor.PID, monitor inf.IMonitor, handler inf.IRpcHandler) inf.IClient {
 	lClient := &LClient{}
 	lClient.pid = pid
 	lClient.IMonitor = monitor
-	lClient.IRpcHandler = rpcHandler
+	lClient.IRpcHandler = handler
 	return lClient
 }
 
 func (lc *LClient) Close() {}
 
 func (lc *LClient) SendMessage(envelope *actor.MsgEnvelope) error {
-	if envelope.IsReply() && !envelope.IsRpc && !envelope.NeedCallback() {
+	if envelope.IsReply() && !envelope.NeedCallback() {
 		defer actor.ReleaseMsgEnvelope(envelope)
 		// 本地Call的回复, 通过reqId找到future,直接返回结果
 		future := lc.Get(envelope.ReqID)
@@ -43,22 +43,17 @@ func (lc *LClient) SendMessage(envelope *actor.MsgEnvelope) error {
 			return errdef.RPCCallTimeout
 		}
 
-		future.SetResult(envelope.Request.(interface{}), envelope.GetError())
+		future.SetResult(envelope.Response, envelope.GetError())
 
 		return nil
 	}
 
-	// 根据自己的pid找到对应的rpcHandler
-	rpcHandler := lc.GetRpcHandler()
-	if rpcHandler == nil || rpcHandler.IsClosed() {
-		// 按道理不会是nil,因为如果服务关闭,会释放掉client,如果走到这里,那么只能是刚好收到一条消息,此时服务又关闭了
-		// 已经被释放了
+	if lc.IsClosed() {
 		actor.ReleaseMsgEnvelope(envelope)
 		return errdef.ServiceNotFound
 	}
 
-	// 直接push消息(envelope会在对应service的rpcHandler调用完成后回收)
-	return rpcHandler.PushRequest(envelope)
+	return lc.PushRequest(envelope)
 }
 
 func (lc *LClient) SendMessageWithFuture(envelope *actor.MsgEnvelope, timeout time.Duration) *actor.Future {
@@ -71,9 +66,7 @@ func (lc *LClient) SendMessageWithFuture(envelope *actor.MsgEnvelope, timeout ti
 	future.SetTimeout(timeout)
 	future.SetReqID(envelope.ReqID)
 
-	// 根据自己的pid找到对应的rpcHandler
-	rpcHandler := lc.GetRpcHandler()
-	if rpcHandler == nil || rpcHandler.IsClosed() {
+	if lc.IsClosed() {
 		actor.ReleaseMsgEnvelope(envelope)
 		future.SetResult(nil, chaoserrors.NewErrCode(errcode.ServiceNotExist, "service rpc handler not exist"))
 		return future
@@ -84,7 +77,8 @@ func (lc *LClient) SendMessageWithFuture(envelope *actor.MsgEnvelope, timeout ti
 	}
 
 	// 这里的envelope如果发生成功,将在rpcRequest处理完成后回收
-	if err := rpcHandler.PushRequest(envelope); err != nil {
+	if err := lc.PushRequest(envelope); err != nil {
+		//if err := rpcHandler.PushRequest(envelope); err != nil {
 		// 发送错误,直接回收信封
 		actor.ReleaseMsgEnvelope(envelope)
 		// 设置错误结果
@@ -103,9 +97,7 @@ func (lc *LClient) AsyncSendMessage(envelope *actor.MsgEnvelope, timeout time.Du
 	future.SetReqID(envelope.ReqID)
 	future.SetCompletions(completions...)
 
-	// 根据自己的pid找到对应的rpcHandler
-	rpcHandler := lc.GetRpcHandler()
-	if rpcHandler == nil || rpcHandler.IsClosed() {
+	if lc.IsClosed() {
 		actor.ReleaseMsgEnvelope(envelope)
 		actor.ReleaseFuture(future)
 		return inf.EmptyCancelRpc, errdef.ServiceNotFound
@@ -118,7 +110,8 @@ func (lc *LClient) AsyncSendMessage(envelope *actor.MsgEnvelope, timeout time.Du
 	}
 
 	// 这里的envelope如果发送成功,将在rpcRequest处理完成后回收
-	if err := rpcHandler.PushRequest(envelope); err != nil {
+	if err := lc.PushRequest(envelope); err != nil {
+		//if err := rpcHandler.PushRequest(envelope); err != nil {
 		// 发送错误,直接回收信封
 		actor.ReleaseMsgEnvelope(envelope)
 		lc.Remove(future.GetReqID())

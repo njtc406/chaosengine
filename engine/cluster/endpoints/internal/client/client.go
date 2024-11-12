@@ -19,7 +19,3 @@ type Client struct {
 func (c *Client) GetPID() *actor.PID {
 	return c.pid
 }
-
-func (c *Client) GetRpcHandler() inf.IRpcHandler {
-	return c.IRpcHandler
-}

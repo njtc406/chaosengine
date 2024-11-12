@@ -8,8 +8,8 @@ package client
 import (
 	"context"
 	"github.com/njtc406/chaosengine/engine/def"
-	"github.com/njtc406/chaosengine/engine/errdef"
-	"sync"
+	"github.com/smallnest/rpcx/protocol"
+	"github.com/smallnest/rpcx/share"
 	"time"
 
 	"github.com/njtc406/chaosengine/engine/actor"
@@ -18,7 +18,6 @@ import (
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/njtc406/chaosengine/engine/utils/serializer"
 	"github.com/smallnest/rpcx/client"
-	"google.golang.org/protobuf/proto"
 )
 
 // 远程服务的Client
@@ -30,7 +29,19 @@ type RemoteClient struct {
 
 func NewRemoteClient(pid *actor.PID, monitor inf.IMonitor) inf.IClient {
 	d, _ := client.NewPeer2PeerDiscovery("tcp@"+pid.GetAddress(), "")
-	rpcClient := client.NewXClient("RPCMonitor", client.Failtry, client.RandomSelect, d, client.DefaultOption)
+	// 如果调用失败,会自动重试3次
+	rpcClient := client.NewXClient("RPCMonitor", client.Failtry, client.RandomSelect, d, client.Option{
+		Retries:             3, // 重试3次
+		RPCPath:             share.DefaultRPCPath,
+		ConnectTimeout:      time.Second,           // 连接超时
+		SerializeType:       protocol.ProtoBuffer,  // 序列化方式
+		CompressType:        protocol.None,         // 压缩方式
+		BackupLatency:       50 * time.Millisecond, // 延迟时间(第一个请求在这个时间内没有回复,则会发送第二次请求)
+		MaxWaitForHeartbeat: 30 * time.Second,      // 心跳时间
+		TCPKeepAlivePeriod:  time.Minute,           // tcp keepalive
+		BidirectionalBlock:  false,                 // 是否允许双向阻塞(true代表发送过去的消息必须消费之后才会再次发送,否则通道阻塞)
+		TimeToDisallow:      time.Minute,
+	})
 
 	remoteClient := &RemoteClient{
 		rpcClient: rpcClient,
@@ -51,26 +62,23 @@ func (rc *RemoteClient) Close() {
 	}
 }
 
-func (rc *RemoteClient) send(envelope *actor.MsgEnvelope) error {
+func (rc *RemoteClient) send(envelope *actor.MsgEnvelope, timeout time.Duration) error {
 	// 这里仅仅代表消息发送成功
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 	// 回收envelope
 	defer actor.ReleaseMsgEnvelope(envelope)
 
 	// 构建发送消息
 	msg := &actor.Message{
 		TypeId:        0, // 默认使用protobuf(后面有其他需求再修改这里)
-		Receiver:      proto.Clone(envelope.Receiver).(*actor.PID),
+		Sender:        envelope.Sender,
+		Receiver:      envelope.Receiver,
 		Method:        envelope.Method,
 		MessageHeader: envelope.Header,
 		Reply:         envelope.Reply,
 		ReqId:         envelope.ReqID,
-		IsRpc:         envelope.IsRpc,
 		Err:           envelope.GetErrStr(),
-	}
-	//log.SysLogger.Debugf("----------->>>>>>>>>>send message[%+v] to %s", envelope, rc.c.GetPID().GetId())
-	if envelope.Sender != nil {
-		msg.Sender = proto.Clone(envelope.Sender).(*actor.PID)
 	}
 
 	byteData, typeName, err := serializer.Serialize(envelope.Request, msg.TypeId)
@@ -89,62 +97,8 @@ func (rc *RemoteClient) send(envelope *actor.MsgEnvelope) error {
 	return nil
 }
 
-func (rc *RemoteClient) call(envelope *actor.MsgEnvelope, timeout time.Duration) error {
-	// 这里仅仅代表消息发送成功
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	// 回收envelope
-	defer actor.ReleaseMsgEnvelope(envelope)
-
-	errCh := make(chan error, 1)
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	asynclib.Go(func() {
-		defer wg.Done()
-		// 构建发送消息
-		msg := &actor.Message{
-			TypeId:        0, // 默认使用protobuf(后面有其他需求再修改这里)
-			Receiver:      proto.Clone(envelope.Receiver).(*actor.PID),
-			Method:        envelope.Method,
-			MessageHeader: envelope.Header,
-			Reply:         envelope.Reply,
-			ReqId:         envelope.ReqID,
-			IsRpc:         envelope.IsRpc,
-			Err:           envelope.GetErrStr(),
-		}
-
-		if envelope.Sender != nil {
-			msg.Sender = proto.Clone(envelope.Sender).(*actor.PID)
-		}
-
-		byteData, typeName, err := serializer.Serialize(envelope.Request, msg.TypeId)
-		if err != nil {
-			log.SysLogger.Errorf("serialize message[%+v] is error: %s", envelope, err)
-			errCh <- err
-			return
-		}
-		msg.Request = byteData
-		msg.TypeName = typeName
-
-		errCh <- rc.rpcClient.Call(ctx, "RPCCall", msg, nil)
-	})
-	wg.Wait()
-	select {
-	case err := <-errCh:
-		if err != nil {
-			log.SysLogger.Errorf("send message[%v] to %s is error: %s", envelope, rc.GetPID().GetServiceUid(), err)
-			return err
-		}
-	case <-ctx.Done():
-		log.SysLogger.Errorf("send message[%v] to %s is timeout", envelope, rc.GetPID().GetServiceUid())
-		return errdef.RPCCallTimeout
-	}
-
-	return nil
-}
-
 func (rc *RemoteClient) SendMessage(envelope *actor.MsgEnvelope) error {
-	return rc.send(envelope)
+	return rc.send(envelope, def.DefaultRpcTimeout)
 }
 
 func (rc *RemoteClient) SendMessageWithFuture(envelope *actor.MsgEnvelope, timeout time.Duration) *actor.Future {
@@ -161,7 +115,7 @@ func (rc *RemoteClient) SendMessageWithFuture(envelope *actor.MsgEnvelope, timeo
 		rc.Add(future)
 	}
 
-	if err := rc.call(envelope, timeout); err != nil {
+	if err := rc.send(envelope, timeout); err != nil {
 		log.SysLogger.Errorf("remote send message[%v] to %s is error: %s", envelope, rc.GetPID().GetServiceUid(), err)
 		future.SetResult(nil, err)
 		return future
@@ -187,7 +141,7 @@ func (rc *RemoteClient) AsyncSendMessage(envelope *actor.MsgEnvelope, timeout ti
 		cancelRpc = NewRpcCancel(rc, envelope.ReqID)
 	}
 
-	if err := rc.call(envelope, timeout); err != nil {
+	if err := rc.send(envelope, timeout); err != nil {
 		rc.Remove(envelope.ReqID)
 		actor.ReleaseFuture(future)
 		return cancelRpc, err

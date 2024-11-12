@@ -62,13 +62,13 @@ func (m *MetaData) reset() {
 }
 
 type MessageData struct {
-	Request interface{} // 请求参数
-	IsRpc   bool        // 是否是rpc调用
+	Request  interface{} // 请求参数
+	Response interface{} // 回复数据
 }
 
 func (m *MessageData) reset() {
 	m.Request = nil
-	m.IsRpc = false
+	m.Response = nil
 }
 
 type Completion struct {

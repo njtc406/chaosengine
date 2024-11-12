@@ -8,7 +8,9 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
+	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
 	github.com/njtc406/chaosutil v1.0.9
+	github.com/njtc406/logrus v1.1.0
 	github.com/oschwald/geoip2-golang v1.11.0
 	github.com/panjf2000/ants/v2 v2.10.0
 	github.com/redis/go-redis/v9 v9.6.1
@@ -23,7 +25,6 @@ require (
 )
 
 require (
-	github.com/RussellLuo/timingwheel v0.0.0-20220218152713-54845bda3108 // indirect
 	github.com/akutz/memconn v0.1.0 // indirect
 	github.com/alitto/pond v1.9.1 // indirect
 	github.com/apache/thrift v0.20.0 // indirect
@@ -69,7 +70,6 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
 	github.com/klauspost/reedsolomon v1.12.3 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
-	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible // indirect
 	github.com/lestrrat-go/strftime v1.0.6 // indirect
 	github.com/libp2p/go-sockaddr v0.2.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
@@ -79,7 +79,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/njtc406/logrus v1.1.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.19.1 // indirect
 	github.com/oschwald/maxminddb-golang v1.13.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect

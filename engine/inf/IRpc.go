@@ -29,15 +29,14 @@ type IRpcInvoker interface {
 }
 
 type IRpcHandler interface {
-	IRpcInvoker
 	IRpcChannel
 
 	GetName() string
-	GetPID() *actor.PID                   // 获取服务id
-	GetRpcHandler() IRpcHandler           // 获取rpc服务
-	HandleRequest(msg *actor.MsgEnvelope) // 处理请求
-	IsPrivate() bool                      // 是否私有服务
-	IsClosed() bool                       // 服务是否已经关闭
+	GetPID() *actor.PID            // 获取服务id
+	GetRpcHandler() IRpcHandler    // 获取rpc服务
+	Handle(msg *actor.MsgEnvelope) // 处理请求
+	IsPrivate() bool               // 是否私有服务
+	IsClosed() bool                // 服务是否已经关闭
 }
 
 // MultiRpcInvoker 多选器(主要是方便调用,所有的调用都可以使用rpc.Selector().Call()的方式来写,不用对返回多个节点的选择器进行处理)

@@ -7,14 +7,15 @@ package repository
 
 import (
 	"github.com/njtc406/chaosengine/engine/actor"
-	"github.com/njtc406/chaosengine/engine/cluster/endpoints/internal/client"
+	"github.com/njtc406/chaosengine/engine/inf"
+	"github.com/njtc406/chaosengine/engine/messagebus"
 	"math/rand"
 )
 
-func (r *Repository) SelectBySvcUid(serviceUid string) *client.Client {
+func (r *Repository) selectByServiceUid(serviceUid string) inf.IClient {
 	v, ok := r.mapPID.Load(serviceUid)
 	if ok {
-		ep := v.(*client.Client)
+		ep := v.(inf.IClient)
 		if ep != nil && !actor.IsRetired(ep.GetPID()) {
 			return ep
 		}
@@ -22,17 +23,35 @@ func (r *Repository) SelectBySvcUid(serviceUid string) *client.Client {
 	return nil
 }
 
+func (r *Repository) SelectByPid(sender, receiver *actor.PID) inf.IBus {
+	c := r.selectByServiceUid(receiver.GetServiceUid())
+	if c != nil {
+		b := messagebus.NewMessageBus(sender, c)
+		return b
+	}
+	return nil
+}
+
+func (r *Repository) SelectBySvcUid(sender *actor.PID, serviceUid string) inf.IBus {
+	c := r.selectByServiceUid(serviceUid)
+	if c != nil {
+		b := messagebus.NewMessageBus(sender, c)
+		return b
+	}
+	return nil
+}
+
 // SelectByNodeUidAndSvcName 根据节点 UID 和服务名称选择服务
-func (r *Repository) SelectByNodeUidAndSvcName(nodeUid, serviceName string) []*client.Client {
+func (r *Repository) SelectByNodeUidAndSvcName(sender *actor.PID, nodeUid, serviceName string) inf.IBus {
 	r.mapNodeLock.RLock()
 	defer r.mapNodeLock.RUnlock()
-	var returnList []*client.Client
+	var returnList inf.MultiBus
 	if nodeInfo, ok := r.mapSvcByNidAndSName[nodeUid]; ok {
 		if serviceInfo, ok := nodeInfo[serviceName]; ok {
 			for serviceUid := range serviceInfo {
-				ep := r.SelectBySvcUid(serviceUid)
-				if ep != nil && !actor.IsRetired(ep.GetPID()) {
-					returnList = append(returnList, ep)
+				c := r.selectByServiceUid(serviceUid)
+				if c != nil && !actor.IsRetired(c.GetPID()) {
+					returnList = append(returnList, messagebus.NewMessageBus(sender, c))
 				}
 			}
 		}
@@ -41,66 +60,68 @@ func (r *Repository) SelectByNodeUidAndSvcName(nodeUid, serviceName string) []*c
 	return returnList
 }
 
-func (r *Repository) SelectAllByName(serviceName string) []*client.Client {
+func (r *Repository) SelectAllByName(sender *actor.PID, serviceName string) inf.IBus {
 	r.mapNodeLock.RLock()
 	defer r.mapNodeLock.RUnlock()
-	var returnList []*client.Client
+	var returnList inf.MultiBus
 	nameMap, ok := r.mapSvcBySNameAndSUid[serviceName]
 	if !ok {
 		return returnList
 	}
 
 	for serviceUid := range nameMap {
-		ep := r.SelectBySvcUid(serviceUid)
-		if ep != nil && !actor.IsRetired(ep.GetPID()) {
-			returnList = append(returnList, ep)
+		c := r.selectByServiceUid(serviceUid)
+		if c != nil && !actor.IsRetired(c.GetPID()) {
+			returnList = append(returnList, messagebus.NewMessageBus(sender, c))
 		}
 	}
 
 	return returnList
 }
 
-func (r *Repository) SelectRandomByName(serviceName string) *client.Client {
-	list := r.SelectAllByName(serviceName)
-	if len(list) == 0 {
+func (r *Repository) SelectRandomByName(sender *actor.PID, serviceName string) inf.IBus {
+	list := r.SelectAllByName(sender, serviceName)
+
+	if len(list.(inf.MultiBus)) == 0 {
 		return nil
 	}
-	if len(list) == 1 {
-		return list[0]
+
+	if len(list.(inf.MultiBus)) == 1 {
+		return list.(inf.MultiBus)[0]
 	}
 
-	idx := rand.Intn(len(list))
-	return list[idx]
+	idx := rand.Intn(len(list.(inf.MultiBus)))
+	return list.(inf.MultiBus)[idx]
 }
 
-func (r *Repository) SelectNameByRule(serviceName string, rule func(pid *actor.PID) bool) []*client.Client {
+func (r *Repository) SelectNameByRule(sender *actor.PID, serviceName string, rule func(pid *actor.PID) bool) inf.IBus {
 	r.mapNodeLock.RLock()
 	defer r.mapNodeLock.RUnlock()
-	var returnList []*client.Client
+	var returnList inf.MultiBus
 	nameMap, ok := r.mapSvcBySNameAndSUid[serviceName]
 	if !ok {
 		return returnList
 	}
 
 	for serviceUid := range nameMap {
-		ep := r.SelectBySvcUid(serviceUid)
-		if ep != nil && !actor.IsRetired(ep.GetPID()) && rule(ep.GetPID()) {
-			returnList = append(returnList, ep)
+		c := r.selectByServiceUid(serviceUid)
+		if c != nil && !actor.IsRetired(c.GetPID()) && rule(c.GetPID()) {
+			returnList = append(returnList, messagebus.NewMessageBus(sender, c))
 		}
 	}
 
 	return returnList
 }
 
-func (r *Repository) SelectByRule(rule func(pid *actor.PID) bool) []*client.Client {
+func (r *Repository) SelectByRule(sender *actor.PID, rule func(pid *actor.PID) bool) inf.IBus {
 	r.mapNodeLock.RLock()
 	defer r.mapNodeLock.RUnlock()
-	var returnList []*client.Client
+	var returnList inf.MultiBus
 	for _, serviceInfo := range r.mapSvcByNidAndSUid {
 		for serviceUid := range serviceInfo {
-			ep := r.SelectBySvcUid(serviceUid)
-			if ep != nil && !actor.IsRetired(ep.GetPID()) && rule(ep.GetPID()) {
-				returnList = append(returnList, ep)
+			c := r.selectByServiceUid(serviceUid)
+			if c != nil && !actor.IsRetired(c.GetPID()) && rule(c.GetPID()) {
+				returnList = append(returnList, messagebus.NewMessageBus(sender, c))
 			}
 		}
 	}

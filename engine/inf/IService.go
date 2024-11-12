@@ -46,6 +46,7 @@ type IIdentifiable interface {
 	SetUid(uid string)
 	GetUid() string
 	GetPID() *actor.PID
+	IsClosed() bool // 服务是否已经关闭
 }
 
 type IProfiler interface {

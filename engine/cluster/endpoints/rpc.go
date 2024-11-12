@@ -32,17 +32,25 @@ func (rm *RPCListener) RPCCall(ctx context.Context, req *actor.Message, _ *RPCRe
 	envelope.Receiver = req.Receiver
 	envelope.Method = req.Method
 	envelope.Reply = req.Reply
-	envelope.IsRpc = req.IsRpc
 	envelope.ReqID = req.ReqId
 	envelope.Header = req.MessageHeader
 	envelope.SetErrStr(req.Err)
 
 	// 反序列化
-	request, err := serializer.Deserialize(req.Request, req.TypeName, req.TypeId)
-	if err != nil {
-		return err
+
+	if req.Reply {
+		response, err := serializer.Deserialize(req.Response, req.TypeName, req.TypeId)
+		if err != nil {
+			return err
+		}
+		envelope.Response = response
+	} else {
+		request, err := serializer.Deserialize(req.Request, req.TypeName, req.TypeId)
+		if err != nil {
+			return err
+		}
+		envelope.Request = request
 	}
-	envelope.Request = request
 
 	if envelope.IsReply() {
 		// 如果是回复,先找到对应的future
@@ -53,7 +61,7 @@ func (rm *RPCListener) RPCCall(ctx context.Context, req *actor.Message, _ *RPCRe
 				return client.SendMessage(envelope)
 			} else {
 				// 同步回调,直接向future设置结果
-				future.SetResult(envelope.Request, envelope.GetError())
+				future.SetResult(envelope.Response, envelope.GetError())
 				actor.ReleaseMsgEnvelope(envelope)
 				return nil
 			}
