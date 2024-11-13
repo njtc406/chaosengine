@@ -12,7 +12,7 @@ import (
 	"math/rand"
 )
 
-func (r *Repository) selectByServiceUid(serviceUid string) inf.IClient {
+func (r *Repository) SelectByServiceUid(serviceUid string) inf.IClient {
 	v, ok := r.mapPID.Load(serviceUid)
 	if ok {
 		ep := v.(inf.IClient)
@@ -24,7 +24,7 @@ func (r *Repository) selectByServiceUid(serviceUid string) inf.IClient {
 }
 
 func (r *Repository) SelectByPid(sender, receiver *actor.PID) inf.IBus {
-	c := r.selectByServiceUid(receiver.GetServiceUid())
+	c := r.SelectByServiceUid(receiver.GetServiceUid())
 	if c != nil {
 		b := messagebus.NewMessageBus(sender, c)
 		return b
@@ -33,7 +33,7 @@ func (r *Repository) SelectByPid(sender, receiver *actor.PID) inf.IBus {
 }
 
 func (r *Repository) SelectBySvcUid(sender *actor.PID, serviceUid string) inf.IBus {
-	c := r.selectByServiceUid(serviceUid)
+	c := r.SelectByServiceUid(serviceUid)
 	if c != nil {
 		b := messagebus.NewMessageBus(sender, c)
 		return b
@@ -45,11 +45,11 @@ func (r *Repository) SelectBySvcUid(sender *actor.PID, serviceUid string) inf.IB
 func (r *Repository) SelectByNodeUidAndSvcName(sender *actor.PID, nodeUid, serviceName string) inf.IBus {
 	r.mapNodeLock.RLock()
 	defer r.mapNodeLock.RUnlock()
-	var returnList inf.MultiBus
+	var returnList messagebus.MultiBus
 	if nodeInfo, ok := r.mapSvcByNidAndSName[nodeUid]; ok {
 		if serviceInfo, ok := nodeInfo[serviceName]; ok {
 			for serviceUid := range serviceInfo {
-				c := r.selectByServiceUid(serviceUid)
+				c := r.SelectByServiceUid(serviceUid)
 				if c != nil && !actor.IsRetired(c.GetPID()) {
 					returnList = append(returnList, messagebus.NewMessageBus(sender, c))
 				}
@@ -63,14 +63,14 @@ func (r *Repository) SelectByNodeUidAndSvcName(sender *actor.PID, nodeUid, servi
 func (r *Repository) SelectAllByName(sender *actor.PID, serviceName string) inf.IBus {
 	r.mapNodeLock.RLock()
 	defer r.mapNodeLock.RUnlock()
-	var returnList inf.MultiBus
+	var returnList messagebus.MultiBus
 	nameMap, ok := r.mapSvcBySNameAndSUid[serviceName]
 	if !ok {
 		return returnList
 	}
 
 	for serviceUid := range nameMap {
-		c := r.selectByServiceUid(serviceUid)
+		c := r.SelectByServiceUid(serviceUid)
 		if c != nil && !actor.IsRetired(c.GetPID()) {
 			returnList = append(returnList, messagebus.NewMessageBus(sender, c))
 		}
@@ -82,29 +82,29 @@ func (r *Repository) SelectAllByName(sender *actor.PID, serviceName string) inf.
 func (r *Repository) SelectRandomByName(sender *actor.PID, serviceName string) inf.IBus {
 	list := r.SelectAllByName(sender, serviceName)
 
-	if len(list.(inf.MultiBus)) == 0 {
+	if len(list.(messagebus.MultiBus)) == 0 {
 		return nil
 	}
 
-	if len(list.(inf.MultiBus)) == 1 {
-		return list.(inf.MultiBus)[0]
+	if len(list.(messagebus.MultiBus)) == 1 {
+		return list.(messagebus.MultiBus)[0]
 	}
 
-	idx := rand.Intn(len(list.(inf.MultiBus)))
-	return list.(inf.MultiBus)[idx]
+	idx := rand.Intn(len(list.(messagebus.MultiBus)))
+	return list.(messagebus.MultiBus)[idx]
 }
 
 func (r *Repository) SelectNameByRule(sender *actor.PID, serviceName string, rule func(pid *actor.PID) bool) inf.IBus {
 	r.mapNodeLock.RLock()
 	defer r.mapNodeLock.RUnlock()
-	var returnList inf.MultiBus
+	var returnList messagebus.MultiBus
 	nameMap, ok := r.mapSvcBySNameAndSUid[serviceName]
 	if !ok {
 		return returnList
 	}
 
 	for serviceUid := range nameMap {
-		c := r.selectByServiceUid(serviceUid)
+		c := r.SelectByServiceUid(serviceUid)
 		if c != nil && !actor.IsRetired(c.GetPID()) && rule(c.GetPID()) {
 			returnList = append(returnList, messagebus.NewMessageBus(sender, c))
 		}
@@ -116,10 +116,10 @@ func (r *Repository) SelectNameByRule(sender *actor.PID, serviceName string, rul
 func (r *Repository) SelectByRule(sender *actor.PID, rule func(pid *actor.PID) bool) inf.IBus {
 	r.mapNodeLock.RLock()
 	defer r.mapNodeLock.RUnlock()
-	var returnList inf.MultiBus
+	var returnList messagebus.MultiBus
 	for _, serviceInfo := range r.mapSvcByNidAndSUid {
 		for serviceUid := range serviceInfo {
-			c := r.selectByServiceUid(serviceUid)
+			c := r.SelectByServiceUid(serviceUid)
 			if c != nil && !actor.IsRetired(c.GetPID()) && rule(c.GetPID()) {
 				returnList = append(returnList, messagebus.NewMessageBus(sender, c))
 			}
@@ -127,4 +127,11 @@ func (r *Repository) SelectByRule(sender *actor.PID, rule func(pid *actor.PID) b
 	}
 
 	return returnList
+}
+
+func (r *Repository) Select(sender *actor.PID, serverId int32, serviceId, serviceName string) inf.IBus {
+	r.mapNodeLock.RLock()
+	defer r.mapNodeLock.RUnlock()
+	serviceUid := actor.CreateServiceUid(serverId, serviceName, serviceId)
+	return r.SelectBySvcUid(sender, serviceUid)
 }

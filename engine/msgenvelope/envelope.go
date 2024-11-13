@@ -1,13 +1,18 @@
-// Package actor
+// Package msgenvelope
 // @Title  数据信封
 // @Description  用于不同service之间的数据传递
 // @Author  yr  2024/9/2 下午3:40
 // @Update  yr  2024/9/2 下午3:40
-package actor
+package msgenvelope
 
 import (
 	"errors"
+	"github.com/njtc406/chaosengine/engine/actor"
+	"github.com/njtc406/chaosengine/engine/inf"
+	"github.com/njtc406/chaosengine/engine/utils/log"
+	"github.com/njtc406/chaosengine/engine/utils/serializer"
 	"github.com/njtc406/chaosengine/engine1/synclib"
+	"time"
 )
 
 type CompletionFunc func(resp interface{}, err error) // 异步回调函数
@@ -44,31 +49,37 @@ func (header Header) ToMap() map[string]string {
 
 // MetaData 消息元数据
 type MetaData struct {
-	Sender   *PID   // 发送者
-	Receiver *PID   // 接收者
-	Method   string // 调用方法
-	ReqID    uint64 // 请求ID(防止重复)
-	Reply    bool   // 是否是回复
-	Header   Header // 消息头
+	Sender       *actor.PID    // 发送者
+	Receiver     *actor.PID    // 接收者
+	SenderClient inf.IClient   // 发送者客户端(用于回调)
+	Method       string        // 调用方法
+	ReqID        uint64        // 请求ID(防止重复,目前还未做防重复逻辑)
+	Reply        bool          // 是否是回复
+	Header       Header        // 消息头
+	Timeout      time.Duration // 请求超时时间
 }
 
 func (m *MetaData) reset() {
 	m.Sender = nil
 	m.Receiver = nil
+	m.SenderClient = nil
 	m.Method = ""
 	m.ReqID = 0
 	m.Reply = false
 	m.Header = nil
+	m.Timeout = 0
 }
 
 type MessageData struct {
 	Request  interface{} // 请求参数
 	Response interface{} // 回复数据
+	NeedResp bool        // 是否需要回复
 }
 
 func (m *MessageData) reset() {
 	m.Request = nil
 	m.Response = nil
+	m.NeedResp = false
 }
 
 type Completion struct {
@@ -114,11 +125,11 @@ func (envelope *MsgEnvelope) SetHeader(key string, value string) {
 	envelope.Header.Set(key, value)
 }
 
-func (envelope *MsgEnvelope) GetSender() *PID {
+func (envelope *MsgEnvelope) GetSender() *actor.PID {
 	return envelope.Sender
 }
 
-func (envelope *MsgEnvelope) GetReceiver() *PID {
+func (envelope *MsgEnvelope) GetReceiver() *actor.PID {
 	return envelope.Receiver
 }
 
@@ -183,7 +194,7 @@ func (envelope *MsgEnvelope) NeedCallback() bool {
 
 func (envelope *MsgEnvelope) RunCompletions() {
 	for _, cb := range envelope.Callbacks {
-		cb(envelope.Request, envelope.Err)
+		cb(envelope.Response, envelope.Err)
 	}
 }
 
@@ -193,9 +204,69 @@ func (envelope *MsgEnvelope) Done() {
 	}
 }
 
-func (envelope *MsgEnvelope) Wait() {
+func (envelope *MsgEnvelope) wait() {
 	<-envelope.done
 }
+
+func (envelope *MsgEnvelope) Wait() {
+	envelope.wait()
+}
+
+func (envelope *MsgEnvelope) Result() (interface{}, error) {
+	envelope.wait()
+	return envelope.Response, envelope.Err
+}
+
+func (envelope *MsgEnvelope) GetReqID() uint64 {
+	return envelope.ReqID
+}
+
+func (envelope *MsgEnvelope) GetTimeout() time.Duration {
+	return envelope.Timeout
+}
+
+func (envelope *MsgEnvelope) ToProtoMsg() *actor.Message {
+	msg := &actor.Message{
+		TypeId:        0, // 默认使用protobuf(后面有其他需求再修改这里)
+		TypeName:      "",
+		Sender:        envelope.Sender,
+		Receiver:      envelope.Receiver,
+		Method:        envelope.Method,
+		Request:       nil,
+		Response:      nil,
+		Err:           envelope.GetErrStr(),
+		MessageHeader: envelope.Header,
+		Reply:         envelope.Reply,
+		ReqId:         envelope.ReqID,
+		NeedResp:      envelope.NeedResp,
+	}
+
+	var byteData []byte
+	var typeName string
+	var err error
+
+	if envelope.Request != nil {
+		byteData, typeName, err = serializer.Serialize(envelope.Request, msg.TypeId)
+		if err != nil {
+			log.SysLogger.Errorf("serialize message[%+v] is error: %s", envelope, err)
+			return nil
+		}
+		msg.Request = byteData
+	} else if envelope.Response != nil {
+		byteData, typeName, err = serializer.Serialize(envelope.Response, msg.TypeId)
+		if err != nil {
+			log.SysLogger.Errorf("serialize message[%+v] is error: %s", envelope, err)
+			return nil
+		}
+		msg.Response = byteData
+	}
+
+	msg.TypeName = typeName
+
+	return msg
+}
+
+//======================================================
 
 var msgEnvelopePool = synclib.NewPoolEx(make(chan synclib.IPoolData, 10240), func() synclib.IPoolData {
 	return &MsgEnvelope{}

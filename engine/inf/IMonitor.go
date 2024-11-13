@@ -6,15 +6,15 @@
 package inf
 
 import (
-	"github.com/njtc406/chaosengine/engine/actor"
+	"github.com/njtc406/chaosengine/engine/msgenvelope"
 )
 
 type IMonitor interface {
-	Init(fun func(f *actor.Future))
+	Init(fun func(f *msgenvelope.MsgEnvelope))
 	Start()
 	Stop()
-	Add(call *actor.Future)
-	Remove(seq uint64) *actor.Future
-	Get(seq uint64) *actor.Future
+	Add(call *msgenvelope.MsgEnvelope)
+	Remove(seq uint64) *msgenvelope.MsgEnvelope
+	Get(seq uint64) *msgenvelope.MsgEnvelope
 	GenSeq() uint64
 }

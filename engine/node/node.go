@@ -6,8 +6,8 @@
 package node
 
 import (
-	"fmt"
 	"github.com/njtc406/chaosengine/engine/cluster"
+	"github.com/njtc406/chaosengine/engine/def"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/node/config"
 	"github.com/njtc406/chaosengine/engine/services"
@@ -37,11 +37,7 @@ func init() {
 }
 
 func GetNodeUID() string {
-	return config.Conf.NodeConf.GetNodeID()
-}
-
-func GenNodeUID(nodeType string, nodeID int32) string {
-	return fmt.Sprintf("%s_%d", nodeType, nodeID)
+	return def.GenNodeUid(config.Conf.NodeConf.ID, config.Conf.NodeConf.Type)
 }
 
 func GetNodeID() int32 {

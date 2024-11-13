@@ -8,7 +8,9 @@ package rpc
 import (
 	"fmt"
 	"github.com/njtc406/chaosengine/engine/actor"
+	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/inf"
+	"github.com/njtc406/chaosengine/engine/msgenvelope"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"reflect"
 	"runtime/debug"
@@ -26,13 +28,17 @@ type MethodInfo struct {
 type Handler struct {
 	inf.IRpcHandler
 
-	internalMap map[string]*MethodInfo
-	isPublic    bool // 是否是公开服务(有rpc调用的服务)
+	methodMap map[string]*MethodInfo
+	isPublic  bool // 是否是公开服务(有rpc调用的服务)
+}
+
+func NewHandler() *Handler {
+	return &Handler{}
 }
 
 func (h *Handler) Init(rpcHandler inf.IRpcHandler) {
 	h.IRpcHandler = rpcHandler
-	h.internalMap = make(map[string]*MethodInfo)
+	h.methodMap = make(map[string]*MethodInfo)
 
 	h.registerMethod()
 }
@@ -105,17 +111,80 @@ func (h *Handler) suitableMethods(method reflect.Method) error {
 	methodInfo.In = in // 这里实际上不需要,如果每次调用都用反射检查输入参数,那么性能会降低
 	methodInfo.Method = method
 	methodInfo.Out = outs
-	h.internalMap[name] = methodInfo
+	h.methodMap[name] = methodInfo
 	return nil
 }
 
-func (h *Handler) Handle(envelope *actor.MsgEnvelope) {
+func (h *Handler) HandleRequest(envelope *msgenvelope.MsgEnvelope) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.SysLogger.Errorf("service[%s] handle message panic: %v\n trace:%s", h.GetName(), r, debug.Stack())
 		}
 	}()
 
+	var (
+		err     error
+		resp    interface{}
+		params  []reflect.Value
+		results []reflect.Value
+	)
+	methodInfo, ok := h.methodMap[envelope.GetMethod()]
+	if !ok {
+		err = errdef.MethodNotFound
+		goto DoCallback
+	}
+
+	params = append(params, reflect.ValueOf(h.GetRpcHandler()))
+	params = append(params, reflect.ValueOf(envelope.Request))
+
+	results = methodInfo.Method.Func.Call(params)
+	if len(results) != len(methodInfo.Out) {
+		// 这里应该不会触发,因为参数检查的时候已经做过了
+		err = fmt.Errorf("method[%s] return value count not match", envelope.GetMethod())
+		goto DoCallback
+	}
+
+	if len(results) == 0 {
+		// 没有返回值
+		goto DoCallback
+	}
+
+DoCallback:
+	if envelope.Sender != nil && envelope.NeedResp {
+		respEnvelope := msgenvelope.NewMsgEnvelope()
+		respEnvelope.Receiver = envelope.Sender
+		respEnvelope.SetReply() // 是回复
+		respEnvelope.Method = envelope.Method
+		respEnvelope.Err = err
+		respEnvelope.Response = resp
+
+		client := h.SelectByPid(envelope.Sender).(inf.IClient)
+		if client == nil {
+			// client已经不存在了,直接返回
+			msgenvelope.ReleaseMsgEnvelope(respEnvelope)
+			log.SysLogger.Errorf("service[%s] send message[%s] response to client failed, client not found: %+v", h.GetName(), envelope.GetMethod(), envelope)
+			return
+		}
+
+		// 设置请求ID
+		respEnvelope.ReqID = client.GenSeq()
+
+		// 回复消息直接发送(respEnvelope由client自动回收)
+		if err = client.SendMessage(respEnvelope); err != nil {
+			log.SysLogger.Errorf("service[%s] send message[%s] response to client failed, error: %v", h.GetName(), envelope.GetMethod(), err)
+		}
+	}
+}
+
+func (h *Handler) HandleResponse(envelope *msgenvelope.MsgEnvelope) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.SysLogger.Errorf("service[%s] handle message panic: %v\n trace:%s", h.GetName(), r, debug.Stack())
+		}
+	}()
+
+	// 执行回调
+	envelope.RunCompletions()
 }
 
 func (h *Handler) GetName() string {

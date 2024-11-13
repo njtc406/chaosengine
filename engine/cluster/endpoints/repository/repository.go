@@ -29,12 +29,12 @@ func NewRepository() *Repository {
 	}
 }
 
-func (r *Repository) Add(ep inf.IClient) {
-	r.mapPID.Store(ep.GetPID().GetServiceUid(), ep)
+func (r *Repository) Add(client inf.IClient) {
+	r.mapPID.Store(client.GetPID().GetServiceUid(), client)
 	r.mapNodeLock.Lock()
 	defer r.mapNodeLock.Unlock()
 
-	pid := ep.GetPID()
+	pid := client.GetPID()
 	nodeUid := pid.GetNodeUid()
 	serviceName := pid.GetName()
 	serviceUid := pid.GetServiceUid()
@@ -79,7 +79,13 @@ func (r *Repository) Add(ep inf.IClient) {
 }
 
 func (r *Repository) Remove(pid *actor.PID) {
-	r.mapPID.Delete(pid.GetServiceUid())
+	client, ok := r.mapPID.LoadAndDelete(pid.GetServiceUid())
+	if !ok {
+		return
+	}
+
+	client.(inf.IClient).Close()
+
 	r.mapNodeLock.Lock()
 	defer r.mapNodeLock.Unlock()
 	serviceName := pid.GetName()

@@ -13,7 +13,6 @@ import (
 type Client struct {
 	pid *actor.PID
 	inf.IRpcHandler
-	inf.IMonitor
 }
 
 func (c *Client) GetPID() *actor.PID {

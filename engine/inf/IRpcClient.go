@@ -6,18 +6,16 @@
 package inf
 
 import (
-	"github.com/njtc406/chaosengine/engine/actor"
-	"time"
+	"github.com/njtc406/chaosengine/engine/msgenvelope"
 )
 
 func EmptyCancelRpc() {}
 
 type IClient interface {
-	IMonitor
 	IRpcHandler
 	Close()
 	// SendMessage 发送消息
-	SendMessage(envelope *actor.MsgEnvelope) error
-	SendMessageWithFuture(envelope *actor.MsgEnvelope, timeout time.Duration) *actor.Future
-	AsyncSendMessage(envelope *actor.MsgEnvelope, timeout time.Duration, completions []actor.CompletionFunc) (CancelRpc, error)
+	SendMessage(envelope *msgenvelope.MsgEnvelope) error
+	SendMessageWithFuture(envelope *msgenvelope.MsgEnvelope)
+	AsyncSendMessage(envelope *msgenvelope.MsgEnvelope, completions []msgenvelope.CompletionFunc) (CancelRpc, error)
 }

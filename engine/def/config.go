@@ -9,6 +9,7 @@ import "github.com/spf13/viper"
 
 type ServiceInitConf struct {
 	Name         string // 服务名称
+	ServerId     int32  // 服务ID
 	TimerSize    int    // 定时器数量
 	MailBoxSize  int    // 事件队列数量
 	GoroutineNum int32  // 协程数量

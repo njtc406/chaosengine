@@ -6,8 +6,8 @@
 package client
 
 import (
-	"github.com/njtc406/chaosengine/engine/def"
 	"github.com/njtc406/chaosengine/engine/errdef"
+	"github.com/njtc406/chaosengine/engine/msgenvelope"
 	"time"
 
 	"github.com/njtc406/chaosengine/engine/actor"
@@ -23,21 +23,20 @@ type LClient struct {
 	Client
 }
 
-func NewLClient(pid *actor.PID, monitor inf.IMonitor, handler inf.IRpcHandler) inf.IClient {
+func NewLClient(pid *actor.PID, handler inf.IRpcHandler) inf.IClient {
 	lClient := &LClient{}
 	lClient.pid = pid
-	lClient.IMonitor = monitor
 	lClient.IRpcHandler = handler
 	return lClient
 }
 
 func (lc *LClient) Close() {}
 
-func (lc *LClient) SendMessage(envelope *actor.MsgEnvelope) error {
+func (lc *LClient) SendMessage(envelope *msgenvelope.MsgEnvelope) error {
 	if envelope.IsReply() && !envelope.NeedCallback() {
-		defer actor.ReleaseMsgEnvelope(envelope)
+		defer msgenvelope.ReleaseMsgEnvelope(envelope)
 		// 本地Call的回复, 通过reqId找到future,直接返回结果
-		future := lc.Get(envelope.ReqID)
+		future := lc.Remove(envelope.ReqID)
 		if future == nil {
 			// 已经超时了,丢弃
 			return errdef.RPCCallTimeout
@@ -49,17 +48,14 @@ func (lc *LClient) SendMessage(envelope *actor.MsgEnvelope) error {
 	}
 
 	if lc.IsClosed() {
-		actor.ReleaseMsgEnvelope(envelope)
+		msgenvelope.ReleaseMsgEnvelope(envelope)
 		return errdef.ServiceNotFound
 	}
 
 	return lc.PushRequest(envelope)
 }
 
-func (lc *LClient) SendMessageWithFuture(envelope *actor.MsgEnvelope, timeout time.Duration) *actor.Future {
-	if timeout == 0 {
-		timeout = def.DefaultRpcTimeout
-	}
+func (lc *LClient) SendMessageWithFuture(envelope *msgenvelope.MsgEnvelope, timeout time.Duration) *actor.Future {
 	future := actor.NewFuture()
 	future.SetSender(envelope.Sender)
 	future.SetMethod(envelope.Method)
@@ -67,12 +63,12 @@ func (lc *LClient) SendMessageWithFuture(envelope *actor.MsgEnvelope, timeout ti
 	future.SetReqID(envelope.ReqID)
 
 	if lc.IsClosed() {
-		actor.ReleaseMsgEnvelope(envelope)
+		msgenvelope.ReleaseMsgEnvelope(envelope)
 		future.SetResult(nil, chaoserrors.NewErrCode(errcode.ServiceNotExist, "service rpc handler not exist"))
 		return future
 	}
 
-	if timeout > 0 {
+	if envelope.NeedResp {
 		lc.Add(future)
 	}
 
@@ -80,7 +76,7 @@ func (lc *LClient) SendMessageWithFuture(envelope *actor.MsgEnvelope, timeout ti
 	if err := lc.PushRequest(envelope); err != nil {
 		//if err := rpcHandler.PushRequest(envelope); err != nil {
 		// 发送错误,直接回收信封
-		actor.ReleaseMsgEnvelope(envelope)
+		msgenvelope.ReleaseMsgEnvelope(envelope)
 		// 设置错误结果
 		future.SetResult(nil, chaoserrors.NewErrCode(errcode.RpcErr, err))
 		return future
@@ -89,7 +85,7 @@ func (lc *LClient) SendMessageWithFuture(envelope *actor.MsgEnvelope, timeout ti
 	return future
 }
 
-func (lc *LClient) AsyncSendMessage(envelope *actor.MsgEnvelope, timeout time.Duration, completions []actor.CompletionFunc) (inf.CancelRpc, error) {
+func (lc *LClient) AsyncSendMessage(envelope *msgenvelope.MsgEnvelope, timeout time.Duration, completions []msgenvelope.CompletionFunc) (inf.CancelRpc, error) {
 	future := actor.NewFuture()
 	future.SetSender(envelope.Sender)
 	future.SetMethod(envelope.Method)
@@ -98,13 +94,13 @@ func (lc *LClient) AsyncSendMessage(envelope *actor.MsgEnvelope, timeout time.Du
 	future.SetCompletions(completions...)
 
 	if lc.IsClosed() {
-		actor.ReleaseMsgEnvelope(envelope)
+		msgenvelope.ReleaseMsgEnvelope(envelope)
 		actor.ReleaseFuture(future)
 		return inf.EmptyCancelRpc, errdef.ServiceNotFound
 	}
 
 	cancelRpc := inf.EmptyCancelRpc
-	if timeout > 0 {
+	if envelope.NeedResp {
 		lc.Add(future)
 		cancelRpc = NewRpcCancel(lc, envelope.ReqID)
 	}
@@ -113,7 +109,7 @@ func (lc *LClient) AsyncSendMessage(envelope *actor.MsgEnvelope, timeout time.Du
 	if err := lc.PushRequest(envelope); err != nil {
 		//if err := rpcHandler.PushRequest(envelope); err != nil {
 		// 发送错误,直接回收信封
-		actor.ReleaseMsgEnvelope(envelope)
+		msgenvelope.ReleaseMsgEnvelope(envelope)
 		lc.Remove(future.GetReqID())
 		actor.ReleaseFuture(future)
 		return inf.EmptyCancelRpc, err
@@ -123,7 +119,6 @@ func (lc *LClient) AsyncSendMessage(envelope *actor.MsgEnvelope, timeout time.Du
 		// 异步等待结果后释放
 		future.Wait()
 		log.SysLogger.Debug("asynclib send message future call back, release future")
-		lc.Remove(future.GetReqID())
 		actor.ReleaseFuture(future)
 	})
 

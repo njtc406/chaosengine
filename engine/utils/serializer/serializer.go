@@ -36,7 +36,7 @@ func Serialize(message interface{}, serializerID int32) ([]byte, string, error) 
 }
 
 func Deserialize(message []byte, typeName string, serializerID int32) (interface{}, error) {
-	if message == nil {
+	if message == nil || len(message) == 0 || typeName == "" {
 		return nil, nil
 	}
 	return serializers[serializerID].Deserialize(typeName, message)

@@ -8,10 +8,12 @@ package core
 import (
 	"fmt"
 	"github.com/njtc406/chaosengine/engine/actor"
+	"github.com/njtc406/chaosengine/engine/cluster/endpoints"
 	"github.com/njtc406/chaosengine/engine/def"
 	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/event"
 	"github.com/njtc406/chaosengine/engine/inf"
+	"github.com/njtc406/chaosengine/engine/msgenvelope"
 	"github.com/njtc406/chaosengine/engine/rpc"
 	"github.com/njtc406/chaosengine/engine/utils/asynclib"
 	"github.com/njtc406/chaosengine/engine/utils/concurrent"
@@ -41,9 +43,12 @@ const (
 type Service struct {
 	Module
 
-	pid          *actor.PID        // 服务基础信息
-	name         string            // 服务名称
-	uid          string            // 服务唯一标识
+	pid      *actor.PID // 服务基础信息
+	name     string     // 服务名称
+	uid      string     // 服务唯一标识
+	serverId int32      // 服务id
+	version  int64      // 服务版本
+
 	src          inf.IService      // 服务源
 	cfg          interface{}       // 服务配置
 	status       int32             // 服务状态(0初始化 1启动中 2启动  3关闭中 4关闭 5退休)
@@ -59,6 +64,7 @@ type Service struct {
 
 func (s *Service) Init(svc interface{}, serviceInitConf *def.ServiceInitConf, cfg interface{}) {
 	// 初始化服务数据
+	s.serverId = serviceInitConf.ServerId
 	s.src = svc.(inf.IService)
 	s.cfg = cfg
 	if s.closeSignal == nil {
@@ -118,8 +124,8 @@ func (s *Service) Start() error {
 	waitRun.Wait()
 
 	// 所有服务都注册到服务列表
-	//s.pid = endpoints.GetEndpointManager().AddService(s.id, s.name, s.GetRpcHandler())
-	//log.SysLogger.Infof(" service[%s] pid: %s", s.GetName(), s.pid.String())
+	s.pid = endpoints.GetEndpointManager().AddService(s.serverId, s.uid, s.name, s.version, s.GetRpcHandler())
+	log.SysLogger.Infof(" service[%s] pid: %s", s.GetName(), s.pid.String())
 	return nil
 }
 
@@ -158,22 +164,22 @@ func (s *Service) run() {
 					log.SysLogger.Error("event type error")
 					break
 				}
-				c := cEvent.Data.(*actor.MsgEnvelope)
-				//if c.IsReply() {
-				//if s.profiler != nil {
-				//	analyzer = s.profiler.Push(fmt.Sprintf("[RPCReply]%s", c.GetMethod()))
-				//}
-				// 回复
-				//s.rpcHandler.HandlerResponse(c)
-				//} else {
-				//if s.profiler != nil {
-				//	analyzer = s.profiler.Push(fmt.Sprintf("[RPCRequest]%s", c.GetMethod()))
-				//}
-				// rpc调用
-				//s.rpcHandler.HandleRequest(c)
-				//}
+				c := cEvent.Data.(*msgenvelope.MsgEnvelope)
+				if c.IsReply() {
+					//if s.profiler != nil {
+					//	analyzer = s.profiler.Push(fmt.Sprintf("[RPCReply]%s", c.GetMethod()))
+					//}
+					// 回复
+					s.rpcHandler.HandleResponse(c)
+				} else {
+					//if s.profiler != nil {
+					//	analyzer = s.profiler.Push(fmt.Sprintf("[RPCRequest]%s", c.GetMethod()))
+					//}
+					// rpc调用
+					s.rpcHandler.HandleRequest(c)
+				}
 
-				actor.ReleaseMsgEnvelope(c)
+				msgenvelope.ReleaseMsgEnvelope(c)
 				event.ReleaseEvent(cEvent)
 				//if analyzer != nil {
 				//	analyzer.Pop()
@@ -264,7 +270,7 @@ func (s *Service) PushEvent(e event.IEvent) error {
 	return s.pushEvent(e)
 }
 
-func (s *Service) PushRequest(c *actor.MsgEnvelope) error {
+func (s *Service) PushRequest(c *msgenvelope.MsgEnvelope) error {
 	ev := event.NewEvent()
 	ev.Type = event.SysEventRpc
 	ev.Data = c
