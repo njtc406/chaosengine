@@ -2,6 +2,8 @@ package event
 
 import (
 	"fmt"
+	"github.com/njtc406/chaosengine/engine/def"
+	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/njtc406/chaosengine/engine/utils/pool"
 	"runtime"
@@ -9,14 +11,11 @@ import (
 )
 
 // 事件接受器
-type EventCallBack func(event IEvent)
-
-type IEvent interface {
-	GetEventType() int
-}
+type EventCallBack func(event inf.IEvent)
 
 type Event struct {
-	Type int
+	def.DataRef
+	Type def.EventType
 	Data interface{}
 	ref  bool
 }
@@ -27,49 +26,37 @@ func (e *Event) Reset() {
 	*e = emptyEvent
 }
 
-func (e *Event) IsRef() bool {
-	return e.ref
-}
-
-func (e *Event) Ref() {
-	e.ref = true
-}
-
-func (e *Event) UnRef() {
-	e.ref = false
-}
-
-func (e *Event) GetEventType() int {
+func (e *Event) GetType() def.EventType {
 	return e.Type
 }
 
 type IEventHandler interface {
 	Init(processor IEventProcessor)
 	GetEventProcessor() IEventProcessor //获得事件
-	NotifyEvent(IEvent)
+	NotifyEvent(inf.IEvent)
 	Destroy()
 	//注册了事件
-	addRegInfo(eventType int, eventProcessor IEventProcessor)
-	removeRegInfo(eventType int, eventProcessor IEventProcessor)
+	addRegInfo(eventType def.EventType, eventProcessor IEventProcessor)
+	removeRegInfo(eventType def.EventType, eventProcessor IEventProcessor)
 }
 
 type IEventChannel interface {
-	PushEvent(ev IEvent) error
+	PushEvent(ev inf.IEvent) error
 }
 
 type IEventProcessor interface {
 	IEventChannel
 
 	Init(eventChannel IEventChannel)
-	EventHandler(ev IEvent)
-	RegEventReceiverFunc(eventType int, receiver IEventHandler, callback EventCallBack)
-	UnRegEventReceiverFun(eventType int, receiver IEventHandler)
+	EventHandler(ev inf.IEvent)
+	RegEventReceiverFunc(eventType def.EventType, receiver IEventHandler, callback EventCallBack)
+	UnRegEventReceiverFun(eventType def.EventType, receiver IEventHandler)
 
-	castEvent(event IEvent) //广播事件
-	addBindEvent(eventType int, receiver IEventHandler, callback EventCallBack)
-	addListen(eventType int, receiver IEventHandler)
-	removeBindEvent(eventType int, receiver IEventHandler)
-	removeListen(eventType int, receiver IEventHandler)
+	castEvent(event inf.IEvent) //广播事件
+	addBindEvent(eventType def.EventType, receiver IEventHandler, callback EventCallBack)
+	addListen(eventType def.EventType, receiver IEventHandler)
+	removeBindEvent(eventType def.EventType, receiver IEventHandler)
+	removeListen(eventType def.EventType, receiver IEventHandler)
 }
 
 type EventHandler struct {
@@ -78,37 +65,37 @@ type EventHandler struct {
 
 	//已经注册的事件
 	locker      sync.RWMutex
-	mapRegEvent map[int]map[IEventProcessor]interface{} //向其他事件处理器监听的事件类型
+	mapRegEvent map[def.EventType]map[IEventProcessor]interface{} //向其他事件处理器监听的事件类型
 }
 
 type EventProcessor struct {
 	IEventChannel
 
 	locker              sync.RWMutex
-	mapListenerEvent    map[int]map[IEventProcessor]int         //监听者信息
-	mapBindHandlerEvent map[int]map[IEventHandler]EventCallBack //收到事件处理
+	mapListenerEvent    map[def.EventType]map[IEventProcessor]int         //监听者信息
+	mapBindHandlerEvent map[def.EventType]map[IEventHandler]EventCallBack //收到事件处理
 }
 
 func NewEventHandler() IEventHandler {
 	eh := EventHandler{}
-	eh.mapRegEvent = map[int]map[IEventProcessor]interface{}{}
+	eh.mapRegEvent = map[def.EventType]map[IEventProcessor]interface{}{}
 
 	return &eh
 }
 
 func NewEventProcessor() IEventProcessor {
 	ep := EventProcessor{}
-	ep.mapListenerEvent = map[int]map[IEventProcessor]int{}
-	ep.mapBindHandlerEvent = map[int]map[IEventHandler]EventCallBack{}
+	ep.mapListenerEvent = map[def.EventType]map[IEventProcessor]int{}
+	ep.mapBindHandlerEvent = map[def.EventType]map[IEventHandler]EventCallBack{}
 
 	return &ep
 }
 
-func (handler *EventHandler) addRegInfo(eventType int, eventProcessor IEventProcessor) {
+func (handler *EventHandler) addRegInfo(eventType def.EventType, eventProcessor IEventProcessor) {
 	handler.locker.Lock()
 	defer handler.locker.Unlock()
 	if handler.mapRegEvent == nil {
-		handler.mapRegEvent = map[int]map[IEventProcessor]interface{}{}
+		handler.mapRegEvent = map[def.EventType]map[IEventProcessor]interface{}{}
 	}
 
 	if _, ok := handler.mapRegEvent[eventType]; ok == false {
@@ -117,7 +104,7 @@ func (handler *EventHandler) addRegInfo(eventType int, eventProcessor IEventProc
 	handler.mapRegEvent[eventType][eventProcessor] = nil
 }
 
-func (handler *EventHandler) removeRegInfo(eventType int, eventProcessor IEventProcessor) {
+func (handler *EventHandler) removeRegInfo(eventType def.EventType, eventProcessor IEventProcessor) {
 	if _, ok := handler.mapRegEvent[eventType]; ok == true {
 		delete(handler.mapRegEvent[eventType], eventProcessor)
 	}
@@ -127,20 +114,20 @@ func (handler *EventHandler) GetEventProcessor() IEventProcessor {
 	return handler.eventProcessor
 }
 
-func (handler *EventHandler) NotifyEvent(ev IEvent) {
+func (handler *EventHandler) NotifyEvent(ev inf.IEvent) {
 	handler.GetEventProcessor().castEvent(ev)
 }
 
 func (handler *EventHandler) Init(processor IEventProcessor) {
 	handler.eventProcessor = processor
-	handler.mapRegEvent = map[int]map[IEventProcessor]interface{}{}
+	handler.mapRegEvent = map[def.EventType]map[IEventProcessor]interface{}{}
 }
 
 func (processor *EventProcessor) Init(eventChannel IEventChannel) {
 	processor.IEventChannel = eventChannel
 }
 
-func (processor *EventProcessor) addBindEvent(eventType int, receiver IEventHandler, callback EventCallBack) {
+func (processor *EventProcessor) addBindEvent(eventType def.EventType, receiver IEventHandler, callback EventCallBack) {
 	processor.locker.Lock()
 	defer processor.locker.Unlock()
 
@@ -151,7 +138,7 @@ func (processor *EventProcessor) addBindEvent(eventType int, receiver IEventHand
 	processor.mapBindHandlerEvent[eventType][receiver] = callback
 }
 
-func (processor *EventProcessor) addListen(eventType int, receiver IEventHandler) {
+func (processor *EventProcessor) addListen(eventType def.EventType, receiver IEventHandler) {
 	processor.locker.Lock()
 	defer processor.locker.Unlock()
 
@@ -162,7 +149,7 @@ func (processor *EventProcessor) addListen(eventType int, receiver IEventHandler
 	processor.mapListenerEvent[eventType][receiver.GetEventProcessor()] += 1
 }
 
-func (processor *EventProcessor) removeBindEvent(eventType int, receiver IEventHandler) {
+func (processor *EventProcessor) removeBindEvent(eventType def.EventType, receiver IEventHandler) {
 	processor.locker.Lock()
 	defer processor.locker.Unlock()
 	if _, ok := processor.mapBindHandlerEvent[eventType]; ok == true {
@@ -170,7 +157,7 @@ func (processor *EventProcessor) removeBindEvent(eventType int, receiver IEventH
 	}
 }
 
-func (processor *EventProcessor) removeListen(eventType int, receiver IEventHandler) {
+func (processor *EventProcessor) removeListen(eventType def.EventType, receiver IEventHandler) {
 	processor.locker.Lock()
 	defer processor.locker.Unlock()
 	if _, ok := processor.mapListenerEvent[eventType]; ok == true {
@@ -181,7 +168,7 @@ func (processor *EventProcessor) removeListen(eventType int, receiver IEventHand
 	}
 }
 
-func (processor *EventProcessor) RegEventReceiverFunc(eventType int, receiver IEventHandler, callback EventCallBack) {
+func (processor *EventProcessor) RegEventReceiverFunc(eventType def.EventType, receiver IEventHandler, callback EventCallBack) {
 	//记录receiver自己注册过的事件
 	receiver.addRegInfo(eventType, processor)
 	//记录当前所属IEventProcessor注册的回调
@@ -190,7 +177,7 @@ func (processor *EventProcessor) RegEventReceiverFunc(eventType int, receiver IE
 	processor.addListen(eventType, receiver)
 }
 
-func (processor *EventProcessor) UnRegEventReceiverFun(eventType int, receiver IEventHandler) {
+func (processor *EventProcessor) UnRegEventReceiverFun(eventType def.EventType, receiver IEventHandler) {
 	processor.removeListen(eventType, receiver)
 	receiver.GetEventProcessor().removeBindEvent(eventType, receiver)
 	receiver.removeRegInfo(eventType, processor)
@@ -210,7 +197,7 @@ func (handler *EventHandler) Destroy() {
 	}
 }
 
-func (processor *EventProcessor) EventHandler(ev IEvent) {
+func (processor *EventProcessor) EventHandler(ev inf.IEvent) {
 	defer func() {
 		if r := recover(); r != nil {
 			buf := make([]byte, 4096)
@@ -220,7 +207,7 @@ func (processor *EventProcessor) EventHandler(ev IEvent) {
 		}
 	}()
 
-	mapCallBack, ok := processor.mapBindHandlerEvent[ev.GetEventType()]
+	mapCallBack, ok := processor.mapBindHandlerEvent[ev.GetType()]
 	if ok == false {
 		return
 	}
@@ -229,13 +216,13 @@ func (processor *EventProcessor) EventHandler(ev IEvent) {
 	}
 }
 
-func (processor *EventProcessor) castEvent(event IEvent) {
+func (processor *EventProcessor) castEvent(event inf.IEvent) {
 	if processor.mapListenerEvent == nil {
 		log.SysLogger.Error("mapListenerEvent not init!")
 		return
 	}
 
-	eventProcessor, ok := processor.mapListenerEvent[event.GetEventType()]
+	eventProcessor, ok := processor.mapListenerEvent[event.GetType()]
 	if ok == false || processor == nil {
 		return
 	}

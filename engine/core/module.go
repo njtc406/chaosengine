@@ -12,7 +12,7 @@ import (
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/concurrent"
 	"github.com/njtc406/chaosengine/engine/utils/log"
-	timer2 "github.com/njtc406/chaosengine/engine/utils/timer"
+	"github.com/njtc406/chaosengine/engine/utils/timer"
 	"reflect"
 	"sync/atomic"
 	"time"
@@ -32,12 +32,12 @@ type Module struct {
 	root         inf.IModule            // 根模块
 	rootContains map[uint32]inf.IModule // 根模块下所有模块(包括所有的子模块)
 
-	mapActiveTimer   map[timer2.ITimer]struct{} // 活跃定时器
-	mapActiveIDTimer map[uint64]timer2.ITimer   // 活跃定时器id
+	mapActiveTimer   map[inf.ITimer]struct{} // 活跃定时器
+	mapActiveIDTimer map[uint64]inf.ITimer   // 活跃定时器id
 
 	eventHandler event.IHandler // 事件处理器
 
-	timerDispatcher *timer2.Dispatcher
+	timerDispatcher *timer.Dispatcher
 }
 
 func (m *Module) AddModule(module inf.IModule) (uint32, error) {
@@ -188,50 +188,50 @@ func (m *Module) ReleaseModule(moduleId uint32) {
 	pModule.parent = nil
 }
 
-func (m *Module) NotifyEvent(e event.IEvent) {
+func (m *Module) NotifyEvent(e inf.IEvent) {
 	m.eventHandler.NotifyEvent(e)
 }
 
-func (m *Module) OnCloseTimer(t timer2.ITimer) {
+func (m *Module) OnCloseTimer(t inf.ITimer) {
 	delete(m.mapActiveIDTimer, t.GetId())
 	delete(m.mapActiveTimer, t)
 }
 
-func (m *Module) OnAddTimer(t timer2.ITimer) {
+func (m *Module) OnAddTimer(t inf.ITimer) {
 	if t != nil {
 		if m.mapActiveTimer == nil {
-			m.mapActiveTimer = map[timer2.ITimer]struct{}{}
+			m.mapActiveTimer = map[inf.ITimer]struct{}{}
 		}
 
 		m.mapActiveTimer[t] = struct{}{}
 	}
 }
 
-func (m *Module) AfterFunc(d time.Duration, cb func(*timer2.Timer)) *timer2.Timer {
+func (m *Module) AfterFunc(d time.Duration, cb func(inf.ITimer)) inf.ITimer {
 	if m.mapActiveTimer == nil {
-		m.mapActiveTimer = map[timer2.ITimer]struct{}{}
+		m.mapActiveTimer = map[inf.ITimer]struct{}{}
 	}
 
 	return m.timerDispatcher.AfterFunc(d, nil, cb, m.OnCloseTimer, m.OnAddTimer)
 }
 
-func (m *Module) CronFunc(cronExpr *timer2.CronExpr, cb func(*timer2.Cron)) *timer2.Cron {
+func (m *Module) CronFunc(cronExpr *timer.CronExpr, cb func(inf.ITimer)) inf.ITimer {
 	if m.mapActiveTimer == nil {
-		m.mapActiveTimer = map[timer2.ITimer]struct{}{}
+		m.mapActiveTimer = map[inf.ITimer]struct{}{}
 	}
 
 	return m.timerDispatcher.CronFunc(cronExpr, nil, cb, m.OnCloseTimer, m.OnAddTimer)
 }
 
-func (m *Module) NewTicker(d time.Duration, cb func(*timer2.Ticker)) *timer2.Ticker {
+func (m *Module) NewTicker(d time.Duration, cb func(inf.ITimer)) inf.ITimer {
 	if m.mapActiveTimer == nil {
-		m.mapActiveTimer = map[timer2.ITimer]struct{}{}
+		m.mapActiveTimer = map[inf.ITimer]struct{}{}
 	}
 
 	return m.timerDispatcher.TickerFunc(d, nil, cb, m.OnCloseTimer, m.OnAddTimer)
 }
 
-func (m *Module) cb(*timer2.Timer) {
+func (m *Module) cb(*timer.Timer) {
 
 }
 
@@ -250,7 +250,7 @@ func (m *Module) GenTimerId() uint64 {
 
 func (m *Module) SafeAfterFunc(timerId *uint64, d time.Duration, AdditionData interface{}, cb func(uint64, interface{})) {
 	if m.mapActiveIDTimer == nil {
-		m.mapActiveIDTimer = map[uint64]timer2.ITimer{}
+		m.mapActiveIDTimer = map[uint64]inf.ITimer{}
 	}
 
 	if *timerId != 0 {
@@ -264,9 +264,9 @@ func (m *Module) SafeAfterFunc(timerId *uint64, d time.Duration, AdditionData in
 	m.mapActiveIDTimer[*timerId] = t
 }
 
-func (m *Module) SafeCronFunc(cronId *uint64, cronExpr *timer2.CronExpr, AdditionData interface{}, cb func(uint64, interface{})) {
+func (m *Module) SafeCronFunc(cronId *uint64, cronExpr *timer.CronExpr, AdditionData interface{}, cb func(uint64, interface{})) {
 	if m.mapActiveIDTimer == nil {
-		m.mapActiveIDTimer = map[uint64]timer2.ITimer{}
+		m.mapActiveIDTimer = map[uint64]inf.ITimer{}
 	}
 
 	*cronId = m.GenTimerId()
@@ -278,7 +278,7 @@ func (m *Module) SafeCronFunc(cronId *uint64, cronExpr *timer2.CronExpr, Additio
 
 func (m *Module) SafeNewTicker(tickerId *uint64, d time.Duration, AdditionData interface{}, cb func(uint64, interface{})) {
 	if m.mapActiveIDTimer == nil {
-		m.mapActiveIDTimer = map[uint64]timer2.ITimer{}
+		m.mapActiveIDTimer = map[uint64]inf.ITimer{}
 	}
 
 	*tickerId = m.GenTimerId()

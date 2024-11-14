@@ -40,7 +40,7 @@ type Service struct {
 	goroutineNum int32              // 协程数量
 	wg           sync.WaitGroup     // 协程等待
 	closeSignal  chan struct{}      // 关闭信号
-	mailBox      chan event.IEvent  // 事件队列
+	mailBox      chan inf.IEvent    // 事件队列
 	profiler     *profiler.Profiler // 性能分析
 
 	rpcHandler     rpc.Handler      // rpc处理器
@@ -48,6 +48,15 @@ type Service struct {
 }
 
 func (s *Service) Init(svc interface{}, serviceInitConf *def.ServiceInitConf, cfg interface{}) {
+	if serviceInitConf == nil {
+		serviceInitConf = &def.ServiceInitConf{
+			Name:         "",
+			ServerId:     0,
+			TimerSize:    def.DefaultTimerSize,
+			MailBoxSize:  def.DefaultMailBoxSize,
+			GoroutineNum: def.DefaultGoroutineNum,
+		}
+	}
 	// 初始化服务数据
 	s.serverId = serviceInitConf.ServerId
 	s.src = svc.(inf.IService)
@@ -67,7 +76,7 @@ func (s *Service) Init(svc interface{}, serviceInitConf *def.ServiceInitConf, cf
 		if serviceInitConf.MailBoxSize == 0 {
 			mailBoxSize = def.DefaultMailBoxSize
 		}
-		s.mailBox = make(chan event.IEvent, mailBoxSize)
+		s.mailBox = make(chan inf.IEvent, mailBoxSize)
 	}
 	s.goroutineNum = serviceInitConf.GoroutineNum
 	if s.goroutineNum == 0 {
@@ -141,7 +150,7 @@ func (s *Service) run() {
 			}
 		case ev := <-s.mailBox:
 			// 事件处理
-			switch ev.GetEventType() {
+			switch ev.GetType() {
 			case event.SysEventRpc:
 				// rpc调用
 				cEvent, ok := ev.(*event.Event)
@@ -176,7 +185,7 @@ func (s *Service) run() {
 					break
 				}
 				if s.profiler != nil {
-					analyzer = s.profiler.Push(fmt.Sprintf("[ClientMsg][%d]", cEvent.GetEventType()))
+					analyzer = s.profiler.Push(fmt.Sprintf("[ClientMsg][%d]", cEvent.GetType()))
 				}
 				//s.rpcHandler.HandlerClientMsg(cEvent.Data)
 				event.ReleaseEvent(cEvent)
@@ -186,7 +195,7 @@ func (s *Service) run() {
 				}
 			default:
 				if s.profiler != nil {
-					analyzer = s.profiler.Push(fmt.Sprintf("[SvcEvent][%d]", ev.GetEventType()))
+					analyzer = s.profiler.Push(fmt.Sprintf("[SvcEvent][%d]", ev.GetType()))
 				}
 				s.eventProcessor.EventHandler(ev)
 				if analyzer != nil {
@@ -241,7 +250,7 @@ func (s *Service) release() {
 	endpoints.GetEndpointManager().RemoveService(s.GetPID())
 }
 
-func (s *Service) pushEvent(e event.IEvent) error {
+func (s *Service) pushEvent(e inf.IEvent) error {
 	if len(s.mailBox) >= cap(s.mailBox) {
 		log.SysLogger.Errorf("service[%s] event channel full", s.GetName())
 		return errdef.EventChannelIsFull
@@ -250,7 +259,7 @@ func (s *Service) pushEvent(e event.IEvent) error {
 	return nil
 }
 
-func (s *Service) PushEvent(e event.IEvent) error {
+func (s *Service) PushEvent(e inf.IEvent) error {
 	return s.pushEvent(e)
 }
 
@@ -336,8 +345,16 @@ func (s *Service) OpenProfiler() {
 	}
 }
 
+func (s *Service) GetProfiler() *profiler.Profiler {
+	return s.profiler
+}
+
 func (s *Service) closeProfiler() {
 	if s.profiler != nil {
 		profiler.UnRegProfiler(s.getUniqueKey())
 	}
+}
+
+func (s *Service) GetServiceCfg() interface{} {
+	return s.cfg
 }

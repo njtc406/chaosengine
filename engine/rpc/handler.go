@@ -20,9 +20,10 @@ import (
 )
 
 type MethodInfo struct {
-	Method reflect.Method
-	In     []reflect.Type
-	Out    []reflect.Type
+	Method   reflect.Method
+	In       []reflect.Type
+	Out      []reflect.Type
+	MultiOut bool
 }
 
 type Handler struct {
@@ -30,10 +31,6 @@ type Handler struct {
 
 	methodMap map[string]*MethodInfo
 	isPublic  bool // 是否是公开服务(有rpc调用的服务)
-}
-
-func NewHandler() *Handler {
-	return &Handler{}
 }
 
 func (h *Handler) Init(rpcHandler inf.IRpcHandler) {
@@ -82,13 +79,9 @@ func (h *Handler) suitableMethods(method reflect.Method) error {
 		}
 	}
 
-	var methodInfo *MethodInfo
+	var methodInfo MethodInfo
 
-	//1.最多两个参数(第一个是输入,第二个是输出)
-	if method.Type.NumIn() > 2 {
-		return fmt.Errorf("%s too many params", method.Name)
-	}
-	//2.判断参数类型,必须是其他地方可调用的
+	// 判断参数类型,必须是其他地方可调用的
 	var in []reflect.Type
 	for i := 0; i < method.Type.NumIn(); i++ {
 		if h.isExportedOrBuiltinType(method.Type.In(i)) == false {
@@ -99,19 +92,42 @@ func (h *Handler) suitableMethods(method reflect.Method) error {
 
 	// 最多两个返回值,一个结果,一个错误
 	var outs []reflect.Type
-	if method.Type.NumOut() > 2 {
-		return fmt.Errorf("%s too many return params", method.Name)
-	}
+
+	// 计算除了error,还有几个返回值
+	var multiOut int
 
 	for i := 0; i < method.Type.NumOut(); i++ {
-		outs = append(outs, method.Type.Out(i))
+		t := method.Type.Out(i)
+		outs = append(outs, t)
+
+		if t.Kind() == reflect.Ptr ||
+			t.Kind() == reflect.Interface ||
+			t.Kind() == reflect.Func ||
+			t.Kind() == reflect.Map ||
+			t.Kind() == reflect.Slice ||
+			t.Kind() == reflect.Chan {
+			if t.Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+				continue
+			} else {
+				multiOut++
+			}
+		} else if t.Kind() == reflect.Struct {
+			// 不允许直接使用结构体,只能给结构体指针
+			return errdef.InputParamCantUseStruct
+		} else {
+			multiOut++
+		}
+	}
+
+	if multiOut > 1 {
+		methodInfo.MultiOut = true
 	}
 
 	name := method.Name
 	methodInfo.In = in // 这里实际上不需要,如果每次调用都用反射检查输入参数,那么性能会降低
 	methodInfo.Method = method
 	methodInfo.Out = outs
-	h.methodMap[name] = methodInfo
+	h.methodMap[name] = &methodInfo
 	return nil
 }
 
@@ -125,6 +141,7 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 	var (
 		params  []reflect.Value
 		results []reflect.Value
+		resp    []interface{}
 	)
 	methodInfo, ok := h.methodMap[envelope.GetMethod()]
 	if !ok {
@@ -135,7 +152,15 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 	params = append(params, reflect.ValueOf(h.GetRpcHandler()))
 	if len(methodInfo.In) > 0 {
 		// 有输入参数
-		params = append(params, reflect.ValueOf(envelope.GetRequest()))
+		req := envelope.GetRequest()
+		switch req.(type) {
+		case []interface{}: // 为了支持本地调用时多参数
+			for _, param := range req.([]interface{}) {
+				params = append(params, reflect.ValueOf(param))
+			}
+		case interface{}:
+			params = append(params, reflect.ValueOf(req))
+		}
 	}
 
 	results = methodInfo.Method.Func.Call(params)
@@ -164,15 +189,42 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 				if err, ok := result.Interface().(error); ok && err != nil {
 					envelope.SetError(err)
 					goto DoResponse
+				} else {
+					continue
 				}
 			} else {
+				var res interface{}
 				if result.IsNil() {
-					envelope.SetResponse(nil)
+					res = nil
 				} else {
-					envelope.SetResponse(result.Interface())
+					res = result.Interface()
+				}
+
+				if methodInfo.MultiOut {
+					resp = append(resp, res)
+				} else {
+					envelope.SetResponse(res)
 				}
 			}
+		} else {
+			var res interface{}
+			if result.IsNil() {
+				res = nil
+			} else {
+				res = result.Interface()
+			}
+
+			if methodInfo.MultiOut {
+				resp = append(resp, res)
+			} else {
+				envelope.SetResponse(res)
+			}
 		}
+	}
+
+	if methodInfo.MultiOut {
+		// 兼容多返回参数
+		envelope.SetResponse(resp)
 	}
 
 DoResponse:
