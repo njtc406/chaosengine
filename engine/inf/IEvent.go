@@ -5,10 +5,10 @@
 // @Update  pc  2024/11/5
 package inf
 
-type EventType int
+import "github.com/njtc406/chaosengine/engine/def"
 
 type IEvent interface {
-	GetType() EventType
+	GetType() def.EventType
 }
 
 type IChannel interface {

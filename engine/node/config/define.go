@@ -34,6 +34,6 @@ type node struct {
 	Type string `json:"type"` // 节点类型
 }
 
-func (n *node) GetNodeID() string {
+func (n *node) GetNodeUid() string {
 	return fmt.Sprintf("%s_%d", n.Type, n.ID)
 }

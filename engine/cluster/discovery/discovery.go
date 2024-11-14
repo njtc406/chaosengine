@@ -14,10 +14,11 @@ import (
 
 	"github.com/njtc406/chaosengine/engine/actor"
 	"github.com/njtc406/chaosengine/engine/cluster/config"
+	"github.com/njtc406/chaosengine/engine/def"
 	"github.com/njtc406/chaosengine/engine/event"
 	"github.com/njtc406/chaosengine/engine/utils/asynclib"
 	"github.com/njtc406/chaosengine/engine/utils/log"
-	"github.com/njtc406/chaosengine/engine/utils/synclib"
+	"github.com/njtc406/chaosengine/engine/utils/pool"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -26,7 +27,7 @@ import (
 const minWatchTTL = time.Second * 3
 
 type watcherInfo struct {
-	synclib.DataRef
+	def.DataRef
 	pid     *actor.PID
 	leaseID clientv3.LeaseID
 	closed  bool
@@ -50,7 +51,7 @@ func (w *watcherInfo) Close() {
 	w.closed = true
 }
 
-var watcherPool = synclib.NewPoolEx(make(chan synclib.IPoolData, 1024), func() synclib.IPoolData {
+var watcherPool = pool.NewPoolEx(make(chan pool.IPoolData, 1024), func() pool.IPoolData {
 	return &watcherInfo{}
 })
 

@@ -42,7 +42,7 @@ func (handler *WSHandler) SetMessageType(messageType int) {
 
 func (handler *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
-		http.Error(w, "Method not allowed", 405)
+		http.Error(w, "method not allowed", 405)
 		return
 	}
 	conn, err := handler.upgrader.Upgrade(w, r, nil)

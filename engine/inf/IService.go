@@ -8,6 +8,7 @@ package inf
 import (
 	"github.com/njtc406/chaosengine/engine/actor"
 	"github.com/njtc406/chaosengine/engine/utils/concurrent"
+	"github.com/njtc406/chaosutil/profiler"
 )
 
 // IService 服务接口
@@ -18,8 +19,7 @@ type IService interface {
 	IIdentifiable
 	IServiceHandler
 	IChannel
-	IRpcService
-	//IProfiler
+	IProfiler
 }
 
 // ILifecycle 服务生命周期
@@ -51,9 +51,6 @@ type IIdentifiable interface {
 
 type IProfiler interface {
 	OpenProfiler()
-	//GetProfiler() *profiler.Profiler
-}
 
-type IRpcService interface {
-	//GetRpcHandler() IRpcHandler
+	GetProfiler() *profiler.Profiler
 }

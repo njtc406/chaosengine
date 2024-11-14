@@ -7,8 +7,8 @@ package node
 
 import (
 	"github.com/njtc406/chaosengine/engine/cluster"
-	"github.com/njtc406/chaosengine/engine/def"
 	"github.com/njtc406/chaosengine/engine/inf"
+	"github.com/njtc406/chaosengine/engine/monitor"
 	"github.com/njtc406/chaosengine/engine/node/config"
 	"github.com/njtc406/chaosengine/engine/services"
 	"github.com/njtc406/chaosengine/engine/utils/asynclib"
@@ -37,7 +37,7 @@ func init() {
 }
 
 func GetNodeUID() string {
-	return def.GenNodeUid(config.Conf.NodeConf.ID, config.Conf.NodeConf.Type)
+	return config.Conf.NodeConf.GetNodeUid()
 }
 
 func GetNodeID() int32 {
@@ -60,9 +60,12 @@ func Start(v string, confPath string) {
 	// 启动线程池
 	asynclib.InitAntsPool(10000)
 
+	// 初始化等待队列
+	monitor.GetRpcMonitor().Init()
+
 	// 初始化集群设置
-	cluster.GetCluster().Init(config.Conf.NodeConf.GetNodeID(), confPath)
-	log.SysLogger.Debugf("cluster.GetCluster().Init config.Conf.NodeConf.GetNodeID() %s", config.Conf.NodeConf.GetNodeID())
+	cluster.GetCluster().Init(config.Conf.NodeConf.ID, config.Conf.NodeConf.Type, confPath)
+	log.SysLogger.Debugf("cluster.GetCluster().Init config.Conf.NodeConf.GetNodeUid() %s", config.Conf.NodeConf.GetNodeUid())
 	cluster.GetCluster().Start()
 
 	// 记录pid

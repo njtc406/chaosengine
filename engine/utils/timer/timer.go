@@ -2,7 +2,8 @@ package timer
 
 import (
 	"fmt"
-	"github.com/njtc406/chaosengine/engine1/synclib"
+	"github.com/njtc406/chaosengine/engine/utils/log"
+	"github.com/njtc406/chaosengine/engine/utils/pool"
 	"reflect"
 	"runtime"
 	"sync/atomic"
@@ -55,15 +56,15 @@ type Cron struct {
 	Timer
 }
 
-var timerPool = synclib.NewPoolEx(make(chan synclib.IPoolData, 10240), func() synclib.IPoolData {
+var timerPool = pool.NewPoolEx(make(chan pool.IPoolData, 10240), func() pool.IPoolData {
 	return &Timer{}
 })
 
-var cronPool = synclib.NewPoolEx(make(chan synclib.IPoolData, 10240), func() synclib.IPoolData {
+var cronPool = pool.NewPoolEx(make(chan pool.IPoolData, 10240), func() pool.IPoolData {
 	return &Cron{}
 })
 
-var tickerPool = synclib.NewPoolEx(make(chan synclib.IPoolData, 10240), func() synclib.IPoolData {
+var tickerPool = pool.NewPoolEx(make(chan pool.IPoolData, 10240), func() pool.IPoolData {
 	return &Ticker{}
 })
 
@@ -128,11 +129,8 @@ func (t *Timer) IsOpen() bool {
 func (t *Timer) Do() {
 	defer func() {
 		if r := recover(); r != nil {
-			//buf := make([]byte, 4096)
-			//l := runtime.Stack(buf, false)
-			//errString := fmt.Sprint(r)
-			//log.Dump(string(buf[:l]), log.String("error", errString))
 			// 纪录日志
+			log.SysLogger.Error(r)
 		}
 	}()
 
@@ -215,10 +213,7 @@ func (c *Cron) Reset() {
 func (c *Cron) Do() {
 	defer func() {
 		if r := recover(); r != nil {
-			//buf := make([]byte, 4096)
-			//l := runtime.Stack(buf, false)
-			//errString := fmt.Sprint(r)
-			//log.Dump(string(buf[:l]), log.String("error", errString))
+			log.SysLogger.Error(r)
 		}
 	}()
 
@@ -271,10 +266,7 @@ func (c *Cron) UnRef() {
 func (c *Ticker) Do() {
 	defer func() {
 		if r := recover(); r != nil {
-			//buf := make([]byte, 4096)
-			//l := runtime.Stack(buf, false)
-			//errString := fmt.Sprint(r)
-			//log.Dump(string(buf[:l]), log.String("error", errString))
+			log.SysLogger.Error(r)
 		}
 	}()
 

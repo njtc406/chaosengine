@@ -8,254 +8,230 @@ package msgenvelope
 import (
 	"errors"
 	"github.com/njtc406/chaosengine/engine/actor"
+	"github.com/njtc406/chaosengine/engine/def"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/log"
+	"github.com/njtc406/chaosengine/engine/utils/pool"
 	"github.com/njtc406/chaosengine/engine/utils/serializer"
-	"github.com/njtc406/chaosengine/engine1/synclib"
 	"time"
 )
 
-type CompletionFunc func(resp interface{}, err error) // 异步回调函数
-
-type Header map[string]string
-
-func (header Header) Get(key string) string {
-	return header[key]
-}
-
-func (header Header) Set(key string, value string) {
-	header[key] = value
-}
-
-func (header Header) Keys() []string {
-	keys := make([]string, 0, len(header))
-	for k := range header {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
-func (header Header) Length() int {
-	return len(header)
-}
-
-func (header Header) ToMap() map[string]string {
-	mp := make(map[string]string)
-	for k, v := range header {
-		mp[k] = v
-	}
-	return mp
-}
-
-// MetaData 消息元数据
-type MetaData struct {
-	Sender       *actor.PID    // 发送者
-	Receiver     *actor.PID    // 接收者
-	SenderClient inf.IClient   // 发送者客户端(用于回调)
-	Method       string        // 调用方法
-	ReqID        uint64        // 请求ID(防止重复,目前还未做防重复逻辑)
-	Reply        bool          // 是否是回复
-	Header       Header        // 消息头
-	Timeout      time.Duration // 请求超时时间
-}
-
-func (m *MetaData) reset() {
-	m.Sender = nil
-	m.Receiver = nil
-	m.SenderClient = nil
-	m.Method = ""
-	m.ReqID = 0
-	m.Reply = false
-	m.Header = nil
-	m.Timeout = 0
-}
-
-type MessageData struct {
-	Request  interface{} // 请求参数
-	Response interface{} // 回复数据
-	NeedResp bool        // 是否需要回复
-}
-
-func (m *MessageData) reset() {
-	m.Request = nil
-	m.Response = nil
-	m.NeedResp = false
-}
-
-type Completion struct {
-	done      chan struct{}    // 完成信号
-	Err       error            // 错误
-	Callbacks []CompletionFunc // 完成回调
-}
-
-func (c *Completion) reset() {
-	if c.done == nil {
-		c.done = make(chan struct{}, 1)
-	}
-	if len(c.done) > 0 {
-		<-c.done
-	}
-	c.Err = nil
-	c.Callbacks = c.Callbacks[:0]
-}
-
 type MsgEnvelope struct {
-	synclib.DataRef
-	MessageData
-	MetaData
-	Completion
+	def.DataRef
+	sender       *actor.PID           // 发送者
+	receiver     *actor.PID           // 接收者
+	senderClient inf.IRpcSender       // 发送者客户端(用于回调)
+	method       string               // 调用方法
+	reqID        uint64               // 请求ID(防止重复,目前还未做防重复逻辑)
+	reply        bool                 // 是否是回复
+	header       def.Header           // 消息头
+	timeout      time.Duration        // 请求超时时间
+	request      interface{}          // 请求参数
+	response     interface{}          // 回复数据
+	needResp     bool                 // 是否需要回复
+	err          error                // 错误
+	callbacks    []def.CompletionFunc // 完成回调
+	done         chan struct{}        // 完成信号
 }
 
-func (envelope *MsgEnvelope) Reset() {
-	envelope.MetaData.reset()
-	envelope.MessageData.reset()
-	envelope.Completion.reset()
+func (e *MsgEnvelope) Reset() {
+	e.sender = nil
+	e.receiver = nil
+	e.senderClient = nil
+	e.method = ""
+	e.reqID = 0
+	e.reply = false
+	e.header = nil
+	e.timeout = 0
+	e.request = nil
+	e.response = nil
+	e.needResp = false
+	if e.done == nil {
+		e.done = make(chan struct{}, 1)
+	}
+	if len(e.done) > 0 {
+		<-e.done
+	}
+	e.err = nil
+	e.callbacks = e.callbacks[:0]
 }
 
-func (envelope *MsgEnvelope) SetHeaders(header Header) {
+func (e *MsgEnvelope) SetHeaders(header def.Header) {
 	for k, v := range header {
-		envelope.Header.Set(k, v)
+		e.SetHeader(k, v)
 	}
 }
 
-func (envelope *MsgEnvelope) SetHeader(key string, value string) {
-	if envelope.Header == nil {
-		envelope.Header = Header{}
+func (e *MsgEnvelope) SetHeader(key string, value string) {
+	e.header.Set(key, value)
+}
+
+func (e *MsgEnvelope) SetSender(sender *actor.PID) {
+	e.sender = sender
+}
+
+func (e *MsgEnvelope) SetReceiver(receiver *actor.PID) {
+	e.receiver = receiver
+}
+
+func (e *MsgEnvelope) SetSenderClient(client inf.IRpcSender) {
+	e.senderClient = client
+}
+
+func (e *MsgEnvelope) SetMethod(method string) {
+	e.method = method
+}
+
+func (e *MsgEnvelope) SetReqId(reqId uint64) {
+	e.reqID = reqId
+}
+
+func (e *MsgEnvelope) SetReply() {
+	e.reply = true
+}
+
+func (e *MsgEnvelope) SetTimeout(timeout time.Duration) {
+	e.timeout = timeout
+}
+
+func (e *MsgEnvelope) SetRequest(req interface{}) {
+	e.request = req
+}
+
+func (e *MsgEnvelope) SetResponse(res interface{}) {
+	e.response = res
+}
+
+func (e *MsgEnvelope) SetError(err error) {
+	e.err = err
+}
+
+func (e *MsgEnvelope) SetErrStr(err string) {
+	if err != "" {
+		return
 	}
-	envelope.Header.Set(key, value)
+
+	e.err = errors.New(err)
 }
 
-func (envelope *MsgEnvelope) GetSender() *actor.PID {
-	return envelope.Sender
+func (e *MsgEnvelope) SetNeedResponse(need bool) {
+	e.needResp = need
 }
 
-func (envelope *MsgEnvelope) GetReceiver() *actor.PID {
-	return envelope.Receiver
+func (e *MsgEnvelope) SetCallback(cbs []def.CompletionFunc) {
+	e.callbacks = append(e.callbacks, cbs...)
 }
 
-func (envelope *MsgEnvelope) GetReq() uint64 {
-	return envelope.ReqID
+func (e *MsgEnvelope) GetHeader(key string) string {
+	return e.header.Get(key)
 }
 
-func (envelope *MsgEnvelope) GetHeaders() map[string]string {
-	if envelope.Header == nil {
-		return EmptyMessageHeader
-	}
-	return envelope.Header.ToMap()
+func (e *MsgEnvelope) GetHeaders() def.Header {
+	return e.header
 }
 
-func (envelope *MsgEnvelope) GetHeader(key string) string {
-	if envelope.Header == nil {
+func (e *MsgEnvelope) GetSender() *actor.PID {
+	return e.sender
+}
+
+func (e *MsgEnvelope) GetReceiver() *actor.PID {
+	return e.receiver
+}
+
+func (e *MsgEnvelope) GetSenderClient() inf.IRpcSender {
+	return e.senderClient
+}
+
+func (e *MsgEnvelope) GetMethod() string {
+	return e.method
+}
+
+func (e *MsgEnvelope) GetReqId() uint64 {
+	return e.reqID
+}
+
+func (e *MsgEnvelope) GetRequest() interface{} {
+	return e.request
+}
+
+func (e *MsgEnvelope) GetResponse() interface{} {
+	return e.response
+}
+
+func (e *MsgEnvelope) GetError() error {
+	return e.err
+}
+
+func (e *MsgEnvelope) GetErrStr() string {
+	if e.err == nil {
 		return ""
 	}
-	return envelope.Header.Get(key)
+	return e.err.Error()
 }
 
-func (envelope *MsgEnvelope) SetReply() {
-	envelope.Reply = true
+func (e *MsgEnvelope) GetTimeout() time.Duration {
+	return e.timeout
 }
 
-func (envelope *MsgEnvelope) IsReply() bool {
-	return envelope.Reply
+func (e *MsgEnvelope) NeedCallback() bool {
+	return len(e.callbacks) > 0
 }
 
-func (envelope *MsgEnvelope) SetError(err error) {
-	envelope.Err = err
+func (e *MsgEnvelope) IsReply() bool {
+	return e.reply
 }
 
-func (envelope *MsgEnvelope) SetErrStr(err string) {
-	if err != "" {
-		envelope.Err = errors.New(err)
+func (e *MsgEnvelope) NeedResponse() bool {
+	return e.needResp
+}
+
+func (e *MsgEnvelope) Done() {
+	if e.done != nil {
+		e.done <- struct{}{}
 	}
 }
 
-func (envelope *MsgEnvelope) GetError() error {
-	return envelope.Err
-}
-
-func (envelope *MsgEnvelope) GetErrStr() string {
-	if envelope.Err != nil {
-		return envelope.Err.Error()
-	}
-	return ""
-}
-
-func (envelope *MsgEnvelope) GetMethod() string {
-	return envelope.Method
-}
-
-func (envelope *MsgEnvelope) AddCompletion(cbs ...CompletionFunc) {
-	envelope.Callbacks = append(envelope.Callbacks, cbs...)
-}
-
-func (envelope *MsgEnvelope) NeedCallback() bool {
-	return len(envelope.Callbacks) > 0
-}
-
-func (envelope *MsgEnvelope) RunCompletions() {
-	for _, cb := range envelope.Callbacks {
-		cb(envelope.Response, envelope.Err)
+func (e *MsgEnvelope) RunCompletions() {
+	for _, cb := range e.callbacks {
+		cb(e.response, e.err)
 	}
 }
 
-func (envelope *MsgEnvelope) Done() {
-	if envelope.done != nil {
-		envelope.done <- struct{}{}
-	}
+func (e *MsgEnvelope) Wait() {
+	<-e.done
 }
 
-func (envelope *MsgEnvelope) wait() {
-	<-envelope.done
-}
-
-func (envelope *MsgEnvelope) Wait() {
-	envelope.wait()
-}
-
-func (envelope *MsgEnvelope) Result() (interface{}, error) {
-	envelope.wait()
-	return envelope.Response, envelope.Err
-}
-
-func (envelope *MsgEnvelope) GetReqID() uint64 {
-	return envelope.ReqID
-}
-
-func (envelope *MsgEnvelope) GetTimeout() time.Duration {
-	return envelope.Timeout
-}
-
-func (envelope *MsgEnvelope) ToProtoMsg() *actor.Message {
+func (e *MsgEnvelope) ToProtoMsg() *actor.Message {
 	msg := &actor.Message{
 		TypeId:        0, // 默认使用protobuf(后面有其他需求再修改这里)
 		TypeName:      "",
-		Sender:        envelope.Sender,
-		Receiver:      envelope.Receiver,
-		Method:        envelope.Method,
+		Sender:        e.sender,
+		Receiver:      e.receiver,
+		Method:        e.method,
 		Request:       nil,
 		Response:      nil,
-		Err:           envelope.GetErrStr(),
-		MessageHeader: envelope.Header,
-		Reply:         envelope.Reply,
-		ReqId:         envelope.ReqID,
-		NeedResp:      envelope.NeedResp,
+		Err:           e.GetErrStr(),
+		MessageHeader: e.header,
+		Reply:         e.reply,
+		ReqId:         e.reqID,
+		NeedResp:      e.needResp,
 	}
 
 	var byteData []byte
 	var typeName string
 	var err error
 
-	if envelope.Request != nil {
-		byteData, typeName, err = serializer.Serialize(envelope.Request, msg.TypeId)
+	if e.request != nil {
+		byteData, typeName, err = serializer.Serialize(e.request, msg.TypeId)
 		if err != nil {
-			log.SysLogger.Errorf("serialize message[%+v] is error: %s", envelope, err)
+			log.SysLogger.Errorf("serialize message[%+v] is error: %s", e, err)
 			return nil
 		}
 		msg.Request = byteData
-	} else if envelope.Response != nil {
-		byteData, typeName, err = serializer.Serialize(envelope.Response, msg.TypeId)
+	} else if e.response != nil {
+		byteData, typeName, err = serializer.Serialize(e.response, msg.TypeId)
 		if err != nil {
-			log.SysLogger.Errorf("serialize message[%+v] is error: %s", envelope, err)
+			log.SysLogger.Errorf("serialize message[%+v] is error: %s", e, err)
 			return nil
 		}
 		msg.Response = byteData
@@ -268,28 +244,18 @@ func (envelope *MsgEnvelope) ToProtoMsg() *actor.Message {
 
 //======================================================
 
-var msgEnvelopePool = synclib.NewPoolEx(make(chan synclib.IPoolData, 10240), func() synclib.IPoolData {
+var msgEnvelopePool = pool.NewPoolEx(make(chan pool.IPoolData, 10240), func() pool.IPoolData {
 	return &MsgEnvelope{}
 })
-
-var EmptyMessageHeader = make(Header)
-
-func NewMsgEnvelopeWithHeader(header Header) *MsgEnvelope {
-	envelope := NewMsgEnvelope()
-	envelope.SetHeaders(header)
-	return envelope
-}
 
 // TODO 记得测试资源释放
 
 func NewMsgEnvelope() *MsgEnvelope {
-	//log.SysLogger.Debugf(">>>>>>>>>>>>>>msg envelope count add: %d", atomic.AddInt64(&envelopeCount, 1))
-
 	return msgEnvelopePool.Get().(*MsgEnvelope)
 }
 
-func ReleaseMsgEnvelope(envelope *MsgEnvelope) {
+func ReleaseMsgEnvelope(envelope inf.IEnvelope) {
 	if envelope != nil {
-		msgEnvelopePool.Put(envelope)
+		msgEnvelopePool.Put(envelope.(*MsgEnvelope))
 	}
 }

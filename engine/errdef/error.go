@@ -14,6 +14,7 @@ var (
 	ServiceNotFound      = errors.New("service not found")
 	RPCCallFailed        = errors.New("RPC call failed")
 	ParamNotMatch        = errors.New("param not match")
+	OutputParamNotMatch  = errors.New("output param not match")
 	MethodNotFound       = errors.New("method not found")
 	RPCHadClosed         = errors.New("RPC had closed")
 	MsgSerializeFailed   = errors.New("message serialize failed")

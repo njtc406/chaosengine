@@ -13,7 +13,7 @@ import (
 	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/event"
 	"github.com/njtc406/chaosengine/engine/inf"
-	"github.com/njtc406/chaosengine/engine/msgenvelope"
+	"github.com/njtc406/chaosengine/engine/profiler"
 	"github.com/njtc406/chaosengine/engine/rpc"
 	"github.com/njtc406/chaosengine/engine/utils/asynclib"
 	"github.com/njtc406/chaosengine/engine/utils/concurrent"
@@ -25,21 +25,6 @@ import (
 	"sync/atomic"
 )
 
-const (
-	defaultTimerSize          = 1024 // 默认定时器数量
-	defaultMailBoxSize        = 1024 // 默认事件队列数量
-	defaultGoroutineNum int32 = 1    // 默认协程数量
-)
-
-const (
-	SvcStatusInit     int32 = iota // 初始化
-	SvcStatusStarting              // 启动中
-	SvcStatusRunning               // 运行中
-	SvcStatusClosing               // 关闭中
-	SvcStatusClosed                // 关闭
-	SvcStatusRetire                // 退休
-)
-
 type Service struct {
 	Module
 
@@ -49,14 +34,14 @@ type Service struct {
 	serverId int32      // 服务id
 	version  int64      // 服务版本
 
-	src          inf.IService      // 服务源
-	cfg          interface{}       // 服务配置
-	status       int32             // 服务状态(0初始化 1启动中 2启动  3关闭中 4关闭 5退休)
-	goroutineNum int32             // 协程数量
-	wg           sync.WaitGroup    // 协程等待
-	closeSignal  chan struct{}     // 关闭信号
-	mailBox      chan event.IEvent // 事件队列
-	//profiler     *Profiler // 性能分析
+	src          inf.IService       // 服务源
+	cfg          interface{}        // 服务配置
+	status       int32              // 服务状态(0初始化 1启动中 2启动  3关闭中 4关闭 5退休)
+	goroutineNum int32              // 协程数量
+	wg           sync.WaitGroup     // 协程等待
+	closeSignal  chan struct{}      // 关闭信号
+	mailBox      chan event.IEvent  // 事件队列
+	profiler     *profiler.Profiler // 性能分析
 
 	rpcHandler     rpc.Handler      // rpc处理器
 	eventProcessor event.IProcessor // 事件管理器
@@ -73,20 +58,20 @@ func (s *Service) Init(svc interface{}, serviceInitConf *def.ServiceInitConf, cf
 	if s.timerDispatcher == nil {
 		var timerSize int
 		if serviceInitConf.TimerSize == 0 {
-			timerSize = defaultTimerSize
+			timerSize = def.DefaultTimerSize
 		}
 		s.timerDispatcher = timer.NewDispatcher(timerSize)
 	}
 	if s.mailBox == nil {
 		var mailBoxSize int
 		if serviceInitConf.MailBoxSize == 0 {
-			mailBoxSize = defaultMailBoxSize
+			mailBoxSize = def.DefaultMailBoxSize
 		}
 		s.mailBox = make(chan event.IEvent, mailBoxSize)
 	}
 	s.goroutineNum = serviceInitConf.GoroutineNum
 	if s.goroutineNum == 0 {
-		s.goroutineNum = defaultGoroutineNum
+		s.goroutineNum = def.DefaultGoroutineNum
 	}
 
 	// rpc处理器
@@ -106,7 +91,7 @@ func (s *Service) Init(svc interface{}, serviceInitConf *def.ServiceInitConf, cf
 
 func (s *Service) Start() error {
 	// 按理说服务都应该是单线程的被初始化,所以应该不需要这样变更状态的
-	if !atomic.CompareAndSwapInt32(&s.status, SvcStatusInit, SvcStatusStarting) {
+	if !atomic.CompareAndSwapInt32(&s.status, def.SvcStatusInit, def.SvcStatusStarting) {
 		return fmt.Errorf("service[%s] status[%d] has inited", s.GetName(), s.status)
 	}
 	var waitRun sync.WaitGroup
@@ -138,7 +123,7 @@ func (s *Service) run() {
 	concurrentCBChannel := concurrent.GetCallBackChannel()
 
 	for {
-		//var analyzer *profiler.Analyzer
+		var analyzer *profiler.Analyzer
 		select {
 		case <-s.closeSignal:
 			if !bStop {
@@ -146,14 +131,14 @@ func (s *Service) run() {
 				concurrent.Close()
 			}
 		case cb := <-concurrentCBChannel:
-			//if s.profiler != nil {
-			//	analyzer = s.profiler.Push(fmt.Sprintf("[Concurrent]%s", reflect.TypeOf(cb).String()))
-			//}
+			if s.profiler != nil {
+				analyzer = s.profiler.Push(fmt.Sprintf("[Concurrent]%s", reflect.TypeOf(cb).String()))
+			}
 			concurrent.DoCallback(cb) // 异步执行
-			//if analyzer != nil {
-			//	analyzer.Pop()
-			//	analyzer = nil
-			//}
+			if analyzer != nil {
+				analyzer.Pop()
+				analyzer = nil
+			}
 		case ev := <-s.mailBox:
 			// 事件处理
 			switch ev.GetEventType() {
@@ -164,62 +149,61 @@ func (s *Service) run() {
 					log.SysLogger.Error("event type error")
 					break
 				}
-				c := cEvent.Data.(*msgenvelope.MsgEnvelope)
+				c := cEvent.Data.(inf.IEnvelope)
 				if c.IsReply() {
-					//if s.profiler != nil {
-					//	analyzer = s.profiler.Push(fmt.Sprintf("[RPCReply]%s", c.GetMethod()))
-					//}
+					if s.profiler != nil {
+						analyzer = s.profiler.Push(fmt.Sprintf("[RPCResponse]%s", c.GetMethod()))
+					}
 					// 回复
 					s.rpcHandler.HandleResponse(c)
 				} else {
-					//if s.profiler != nil {
-					//	analyzer = s.profiler.Push(fmt.Sprintf("[RPCRequest]%s", c.GetMethod()))
-					//}
+					if s.profiler != nil {
+						analyzer = s.profiler.Push(fmt.Sprintf("[RPCRequest]%s", c.GetMethod()))
+					}
 					// rpc调用
 					s.rpcHandler.HandleRequest(c)
 				}
 
-				msgenvelope.ReleaseMsgEnvelope(c)
 				event.ReleaseEvent(cEvent)
-				//if analyzer != nil {
-				//	analyzer.Pop()
-				//	analyzer = nil
-				//}
+				if analyzer != nil {
+					analyzer.Pop()
+					analyzer = nil
+				}
 			case event.SysEventClientMsg:
 				cEvent, ok := ev.(*event.Event)
 				if !ok {
 					log.SysLogger.Error("event type error")
 					break
 				}
-				//if s.profiler != nil {
-				//	analyzer = s.profiler.Push(fmt.Sprintf("[ClientMsg][%d]", cEvent.GetEventType()))
-				//}
+				if s.profiler != nil {
+					analyzer = s.profiler.Push(fmt.Sprintf("[ClientMsg][%d]", cEvent.GetEventType()))
+				}
 				//s.rpcHandler.HandlerClientMsg(cEvent.Data)
 				event.ReleaseEvent(cEvent)
-				//if analyzer != nil {
-				//	analyzer.Pop()
-				//	analyzer = nil
-				//}
+				if analyzer != nil {
+					analyzer.Pop()
+					analyzer = nil
+				}
 			default:
-				//if s.profiler != nil {
-				//	analyzer = s.profiler.Push(fmt.Sprintf("[SvcEvent][%d]", ev.GetEventType()))
-				//}
+				if s.profiler != nil {
+					analyzer = s.profiler.Push(fmt.Sprintf("[SvcEvent][%d]", ev.GetEventType()))
+				}
 				s.eventProcessor.EventHandler(ev)
-				//if analyzer != nil {
-				//	analyzer.Pop()
-				//	analyzer = nil
-				//}
+				if analyzer != nil {
+					analyzer.Pop()
+					analyzer = nil
+				}
 			}
 		case t := <-s.timerDispatcher.ChanTimer:
 			// 定时器处理
-			//if s.profiler != nil {
-			//	analyzer = s.profiler.Push("[timer]" + s.GetName() + "." + t.GetName())
-			//}
+			if s.profiler != nil {
+				analyzer = s.profiler.Push("[timer]" + s.GetName() + "." + t.GetName())
+			}
 			t.Do()
-			//if analyzer != nil {
-			//	analyzer.Pop()
-			//	analyzer = nil
-			//}
+			if analyzer != nil {
+				analyzer.Pop()
+				analyzer = nil
+			}
 		}
 
 		if bStop {
@@ -238,9 +222,9 @@ func (s *Service) run() {
 
 func (s *Service) Stop() {
 	close(s.closeSignal)
-	s.status = SvcStatusClosing
+	s.status = def.SvcStatusClosing
 	s.wg.Wait()
-	s.status = SvcStatusClosed
+	s.status = def.SvcStatusClosed
 }
 
 func (s *Service) release() {
@@ -250,11 +234,11 @@ func (s *Service) release() {
 		}
 	}()
 
-	s.self.OnRelease() // 这里是为了能调用到子类的方法
-	//s.CloseProfiler()
+	s.self.OnRelease()
+	s.closeProfiler()
 
-	// 服务关闭,从服务移除
-	//endpoints.GetEndpointManager().RemoveService(s.GetPID())
+	// 服务关闭,从服务移除(等待其他释放完再移除,防止在释放的时候有同步调用,例如db等,会导致调用失败)
+	endpoints.GetEndpointManager().RemoveService(s.GetPID())
 }
 
 func (s *Service) pushEvent(e event.IEvent) error {
@@ -270,7 +254,7 @@ func (s *Service) PushEvent(e event.IEvent) error {
 	return s.pushEvent(e)
 }
 
-func (s *Service) PushRequest(c *msgenvelope.MsgEnvelope) error {
+func (s *Service) PushRequest(c inf.IEnvelope) error {
 	ev := event.NewEvent()
 	ev.Type = event.SysEventRpc
 	ev.Data = c
@@ -320,7 +304,7 @@ func (s *Service) OnStart() error {
 func (s *Service) OnRelease() {}
 
 func (s *Service) SetGoRoutineNum(goroutineNum int32) {
-	if atomic.LoadInt32(&s.status) != SvcStatusInit { // 已经启动的不允许修改
+	if atomic.LoadInt32(&s.status) != def.SvcStatusInit { // 已经启动的不允许修改
 		return
 	}
 
@@ -334,5 +318,26 @@ func (s *Service) OnSetup(svc inf.IService) {
 }
 
 func (s *Service) IsClosed() bool {
-	return atomic.LoadInt32(&s.status) > SvcStatusRunning
+	return atomic.LoadInt32(&s.status) > def.SvcStatusRunning
+}
+
+func (s *Service) getUniqueKey() string {
+	var name = s.GetName()
+	if s.uid != "" {
+		name = fmt.Sprintf("%s-%s", name, s.uid)
+	}
+	return name
+}
+
+func (s *Service) OpenProfiler() {
+	s.profiler = profiler.RegProfiler(s.getUniqueKey())
+	if s.profiler == nil {
+		log.SysLogger.Fatalf("profiler %s reg fail", s.GetName())
+	}
+}
+
+func (s *Service) closeProfiler() {
+	if s.profiler != nil {
+		profiler.UnRegProfiler(s.getUniqueKey())
+	}
 }

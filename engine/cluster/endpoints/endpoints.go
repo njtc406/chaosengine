@@ -7,10 +7,11 @@ package endpoints
 
 import (
 	"github.com/njtc406/chaosengine/engine/actor"
+	"github.com/njtc406/chaosengine/engine/cluster/endpoints/client"
+	"github.com/njtc406/chaosengine/engine/cluster/endpoints/remote"
 	"github.com/njtc406/chaosengine/engine/cluster/endpoints/repository"
 	"github.com/njtc406/chaosengine/engine/event"
 	"github.com/njtc406/chaosengine/engine/inf"
-	"github.com/njtc406/chaosengine/engine/messagebus/client"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -22,7 +23,7 @@ type EndpointManager struct {
 	event.IProcessor
 	event.IHandler
 
-	remote     *Remote                // 通讯器
+	remote     *remote.Remote         // 通讯器
 	stopped    bool                   // 是否已停止
 	repository *repository.Repository // 服务存储仓库
 }
@@ -31,8 +32,8 @@ func GetEndpointManager() *EndpointManager {
 	return endMgr
 }
 
-func (em *EndpointManager) Init(nodeUID, addr string, eventProcessor event.IProcessor) {
-	em.remote = NewRemote(nodeUID, addr)
+func (em *EndpointManager) Init(nodeId int32, nodeType, addr string, eventProcessor event.IProcessor) {
+	em.remote = remote.NewRemote(nodeId, nodeType, addr, new(RPCListener))
 	em.remote.Init()
 
 	em.IProcessor = eventProcessor
@@ -60,10 +61,6 @@ func (em *EndpointManager) Stop() {
 	em.stopped = true
 }
 
-func (em *EndpointManager) GetUID() string {
-	return em.remote.GetNodeUID()
-}
-
 // updateServiceInfo 更新远程服务信息事件
 func (em *EndpointManager) updateServiceInfo(e event.IEvent) {
 	//log.SysLogger.Debugf("endpoints receive update service event: %+v", e)
@@ -75,7 +72,7 @@ func (em *EndpointManager) updateServiceInfo(e event.IEvent) {
 			log.SysLogger.Errorf("unmarshal pid error: %v", err)
 			return
 		}
-		if pid.GetNodeUid() == em.remote.GetNodeUID() {
+		if pid.GetAddress() == em.remote.GetAddress() {
 			log.SysLogger.Debugf("local service: %s, pid: %+v", pid.String(), &pid)
 			// 本地服务,忽略
 			return
@@ -102,7 +99,7 @@ func (em *EndpointManager) removeServiceInfo(e event.IEvent) {
 
 // AddService 添加本地服务到服务发现中
 func (em *EndpointManager) AddService(serverId int32, serviceID, serviceName string, version int64, rpcHandler inf.IRpcHandler) *actor.PID {
-	pid := actor.NewPID(em.remote.GetNodeUID(), em.remote.GetAddress(), serverId, serviceID, serviceName, version)
+	pid := actor.NewPID(em.remote.GetNodeId(), em.remote.GetNodeType(), em.remote.GetAddress(), serverId, serviceID, serviceName, version)
 	log.SysLogger.Debugf("add local service: %s, pid: %v", pid.String(), rpcHandler)
 	em.repository.Add(client.NewLClient(pid, rpcHandler))
 
@@ -126,7 +123,7 @@ func (em *EndpointManager) RemoveService(pid *actor.PID) {
 	em.repository.Remove(pid)
 }
 
-func (em *EndpointManager) GetClient(serviceUid string) inf.IClient {
+func (em *EndpointManager) GetClient(serviceUid string) inf.IRpcSender {
 	return em.repository.SelectByServiceUid(serviceUid)
 }
 
@@ -141,4 +138,8 @@ func (em *EndpointManager) SelectByPid(sender, receiver *actor.PID) inf.IBus {
 // SelectByRule 根据自定义规则选择服务
 func (em *EndpointManager) SelectByRule(sender *actor.PID, rule func(pid *actor.PID) bool) inf.IBus {
 	return em.repository.SelectByRule(sender, rule)
+}
+
+func (em *EndpointManager) SelectByNodeType(sender *actor.PID, nodeType, serviceName string) inf.IBus {
+	return em.repository.SelectByNodeType(sender, nodeType, serviceName)
 }

@@ -115,7 +115,7 @@ func (h *Handler) suitableMethods(method reflect.Method) error {
 	return nil
 }
 
-func (h *Handler) HandleRequest(envelope *msgenvelope.MsgEnvelope) {
+func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.SysLogger.Errorf("service[%s] handle message panic: %v\n trace:%s", h.GetName(), r, debug.Stack())
@@ -123,60 +123,76 @@ func (h *Handler) HandleRequest(envelope *msgenvelope.MsgEnvelope) {
 	}()
 
 	var (
-		err     error
-		resp    interface{}
 		params  []reflect.Value
 		results []reflect.Value
 	)
 	methodInfo, ok := h.methodMap[envelope.GetMethod()]
 	if !ok {
-		err = errdef.MethodNotFound
-		goto DoCallback
+		envelope.SetError(errdef.MethodNotFound)
+		goto DoResponse
 	}
 
 	params = append(params, reflect.ValueOf(h.GetRpcHandler()))
-	params = append(params, reflect.ValueOf(envelope.Request))
+	if len(methodInfo.In) > 0 {
+		// 有输入参数
+		params = append(params, reflect.ValueOf(envelope.GetRequest()))
+	}
 
 	results = methodInfo.Method.Func.Call(params)
 	if len(results) != len(methodInfo.Out) {
 		// 这里应该不会触发,因为参数检查的时候已经做过了
-		err = fmt.Errorf("method[%s] return value count not match", envelope.GetMethod())
-		goto DoCallback
+		log.SysLogger.Errorf("method[%s] return value count not match", envelope.GetMethod())
+		envelope.SetError(errdef.OutputParamNotMatch)
+		goto DoResponse
 	}
 
 	if len(results) == 0 {
 		// 没有返回值
-		goto DoCallback
+		goto DoResponse
 	}
 
-DoCallback:
-	if envelope.Sender != nil && envelope.NeedResp {
-		respEnvelope := msgenvelope.NewMsgEnvelope()
-		respEnvelope.Receiver = envelope.Sender
-		respEnvelope.SetReply() // 是回复
-		respEnvelope.Method = envelope.Method
-		respEnvelope.Err = err
-		respEnvelope.Response = resp
-
-		client := h.SelectByPid(envelope.Sender).(inf.IClient)
-		if client == nil {
-			// client已经不存在了,直接返回
-			msgenvelope.ReleaseMsgEnvelope(respEnvelope)
-			log.SysLogger.Errorf("service[%s] send message[%s] response to client failed, client not found: %+v", h.GetName(), envelope.GetMethod(), envelope)
-			return
+	// 解析返回
+	for i, t := range methodInfo.Out {
+		result := results[i]
+		if t.Kind() == reflect.Ptr ||
+			t.Kind() == reflect.Interface ||
+			t.Kind() == reflect.Func ||
+			t.Kind() == reflect.Map ||
+			t.Kind() == reflect.Slice ||
+			t.Kind() == reflect.Chan {
+			if t.Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+				if err, ok := result.Interface().(error); ok && err != nil {
+					envelope.SetError(err)
+					goto DoResponse
+				}
+			} else {
+				if result.IsNil() {
+					envelope.SetResponse(nil)
+				} else {
+					envelope.SetResponse(result.Interface())
+				}
+			}
 		}
+	}
 
-		// 设置请求ID
-		respEnvelope.ReqID = client.GenSeq()
+DoResponse:
+	if envelope.NeedResponse() {
+		// 需要回复
+		envelope.SetReply()      // 这是回复
+		envelope.SetRequest(nil) // 清除请求数据
 
-		// 回复消息直接发送(respEnvelope由client自动回收)
-		if err = client.SendMessage(respEnvelope); err != nil {
-			log.SysLogger.Errorf("service[%s] send message[%s] response to client failed, error: %v", h.GetName(), envelope.GetMethod(), err)
+		// 发送回复信息
+		if err := envelope.GetSenderClient().SendResponse(envelope); err != nil {
+			log.SysLogger.Errorf("service[%s] send response failed: %v", h.GetName(), err)
+			msgenvelope.ReleaseMsgEnvelope(envelope)
 		}
+	} else {
+		// 不需要回复,释放资源
+		msgenvelope.ReleaseMsgEnvelope(envelope)
 	}
 }
 
-func (h *Handler) HandleResponse(envelope *msgenvelope.MsgEnvelope) {
+func (h *Handler) HandleResponse(envelope inf.IEnvelope) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.SysLogger.Errorf("service[%s] handle message panic: %v\n trace:%s", h.GetName(), r, debug.Stack())
@@ -185,6 +201,9 @@ func (h *Handler) HandleResponse(envelope *msgenvelope.MsgEnvelope) {
 
 	// 执行回调
 	envelope.RunCompletions()
+
+	// 释放资源
+	msgenvelope.ReleaseMsgEnvelope(envelope)
 }
 
 func (h *Handler) GetName() string {

@@ -5,7 +5,6 @@ package asynclib
 
 import (
 	"fmt"
-	"github.com/njtc406/chaosutil/chaoserrors"
 	"github.com/panjf2000/ants/v2"
 )
 
@@ -25,8 +24,7 @@ func InitAntsPool(size int) {
 func Go(f func()) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			errString := fmt.Sprint(r)
-			err = chaoserrors.NewErrCode(-1, errString, nil)
+			err = fmt.Errorf("groutine exec func failed, err:%v", r)
 		}
 	}()
 

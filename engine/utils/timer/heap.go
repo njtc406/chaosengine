@@ -2,7 +2,7 @@ package timer
 
 import (
 	"container/heap"
-	"github.com/njtc406/chaosengine/engine1/timer/timelib"
+	"github.com/njtc406/chaosengine/engine/utils/timelib"
 	"sync"
 	"time"
 )

@@ -7,23 +7,19 @@ package inf
 
 import (
 	"github.com/njtc406/chaosengine/engine/actor"
-	"github.com/njtc406/chaosengine/engine/msgenvelope"
 )
-
-type RequestHandler func(Returns []interface{}, Err string)
-type CancelRpc func() // 异步调用时的取消函数,可用于取消调用
 
 type IRpcHandler interface {
 	IRpcChannel
 	IRpcSelector
 
 	GetName() string
-	GetPID() *actor.PID                          // 获取服务id
-	GetRpcHandler() IRpcHandler                  // 获取rpc服务
-	HandleRequest(msg *msgenvelope.MsgEnvelope)  // 处理请求
-	HandleResponse(msg *msgenvelope.MsgEnvelope) // 处理回复
-	IsPrivate() bool                             // 是否私有服务
-	IsClosed() bool                              // 服务是否已经关闭
+	GetPID() *actor.PID           // 获取服务id
+	GetRpcHandler() IRpcHandler   // 获取rpc服务
+	HandleRequest(msg IEnvelope)  // 处理请求
+	HandleResponse(msg IEnvelope) // 处理回复
+	IsPrivate() bool              // 是否私有服务
+	IsClosed() bool               // 服务是否已经关闭
 }
 
 type IRpcSelector interface {
@@ -38,5 +34,5 @@ type IRpcSelector interface {
 }
 
 type IRpcChannel interface {
-	PushRequest(req *msgenvelope.MsgEnvelope) error
+	PushRequest(req IEnvelope) error
 }

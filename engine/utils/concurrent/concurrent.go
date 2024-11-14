@@ -2,7 +2,7 @@ package concurrent
 
 import (
 	"errors"
-	"github.com/njtc406/chaosengine/engine1/log"
+	"github.com/njtc406/chaosengine/engine/utils/log"
 	"runtime"
 	"sync/atomic"
 )

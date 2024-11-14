@@ -12,42 +12,30 @@ import (
 )
 
 type Repository struct {
-	mapPID      *sync.Map // 服务 [serviceUid]inf.IClient
+	mapPID      *sync.Map // 服务 [serviceUid]inf.IRpcSender
 	mapNodeLock sync.RWMutex
 	// 快速查询表
-	mapSvcByNidAndSUid   map[string]map[string]struct{}            // [nodeUid]map[serviceUid]struct{}
 	mapSvcBySNameAndSUid map[string]map[string]struct{}            // [serviceName]map[serviceUid]struct{}
-	mapSvcByNidAndSName  map[string]map[string]map[string]struct{} // [nodeUid]map[serviceName]map[serviceUid]struct{}
+	mapSvcByNtpAndSName  map[string]map[string]map[string]struct{} // [nodeType]map[serviceName]map[serviceUid]struct{}
 }
 
 func NewRepository() *Repository {
 	return &Repository{
 		mapPID:               new(sync.Map),
-		mapSvcByNidAndSUid:   make(map[string]map[string]struct{}),
 		mapSvcBySNameAndSUid: make(map[string]map[string]struct{}),
-		mapSvcByNidAndSName:  make(map[string]map[string]map[string]struct{}),
+		mapSvcByNtpAndSName:  make(map[string]map[string]map[string]struct{}),
 	}
 }
 
-func (r *Repository) Add(client inf.IClient) {
+func (r *Repository) Add(client inf.IRpcSender) {
 	r.mapPID.Store(client.GetPID().GetServiceUid(), client)
 	r.mapNodeLock.Lock()
 	defer r.mapNodeLock.Unlock()
 
 	pid := client.GetPID()
-	nodeUid := pid.GetNodeUid()
+	nodeType := pid.GetNodeType()
 	serviceName := pid.GetName()
 	serviceUid := pid.GetServiceUid()
-
-	nodeUidMap, ok := r.mapSvcByNidAndSUid[nodeUid]
-	if !ok {
-		r.mapSvcByNidAndSUid[nodeUid] = make(map[string]struct{})
-		nodeUidMap = r.mapSvcByNidAndSUid[nodeUid]
-	}
-	_, ok = nodeUidMap[serviceUid]
-	if !ok {
-		nodeUidMap[serviceUid] = struct{}{}
-	}
 
 	nameMap, ok := r.mapSvcBySNameAndSUid[serviceName]
 	if !ok {
@@ -60,10 +48,10 @@ func (r *Repository) Add(client inf.IClient) {
 		nameMap[serviceUid] = struct{}{}
 	}
 
-	nodeNameUidMap, ok := r.mapSvcByNidAndSName[nodeUid]
+	nodeNameUidMap, ok := r.mapSvcByNtpAndSName[nodeType]
 	if !ok {
-		r.mapSvcByNidAndSName[nodeUid] = make(map[string]map[string]struct{})
-		nodeNameUidMap = r.mapSvcByNidAndSName[nodeUid]
+		r.mapSvcByNtpAndSName[nodeType] = make(map[string]map[string]struct{})
+		nodeNameUidMap = r.mapSvcByNtpAndSName[nodeType]
 	}
 
 	nameUidMap, ok := nodeNameUidMap[serviceName]
@@ -84,23 +72,13 @@ func (r *Repository) Remove(pid *actor.PID) {
 		return
 	}
 
-	client.(inf.IClient).Close()
+	client.(inf.IRpcSender).Close()
 
 	r.mapNodeLock.Lock()
 	defer r.mapNodeLock.Unlock()
 	serviceName := pid.GetName()
 	serviceUid := pid.GetServiceUid()
-	nodeUid := pid.GetNodeUid()
-
-	nodeUidMap, ok := r.mapSvcByNidAndSUid[nodeUid]
-	if ok {
-		delete(nodeUidMap, serviceUid)
-		if len(nodeUidMap) == 0 {
-			delete(r.mapSvcByNidAndSUid, nodeUid)
-		}
-	} else {
-		return
-	}
+	nodeType := pid.GetNodeType()
 
 	nameMap, ok := r.mapSvcBySNameAndSUid[serviceName]
 	if ok {
@@ -112,7 +90,7 @@ func (r *Repository) Remove(pid *actor.PID) {
 		return
 	}
 
-	nodeNameUidMap, ok := r.mapSvcByNidAndSName[nodeUid]
+	nodeNameUidMap, ok := r.mapSvcByNtpAndSName[nodeType]
 	if ok {
 		nameUidMap, ok := nodeNameUidMap[serviceName]
 		if ok {
@@ -122,7 +100,7 @@ func (r *Repository) Remove(pid *actor.PID) {
 			}
 		}
 		if len(nodeNameUidMap) == 0 {
-			delete(r.mapSvcByNidAndSName, nodeUid)
+			delete(r.mapSvcByNtpAndSName, nodeType)
 		}
 	}
 }

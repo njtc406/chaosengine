@@ -25,3 +25,7 @@ func (h *Handler) SelectByPid(receiver *actor.PID) inf.IBus {
 func (h *Handler) SelectByRule(rule func(pid *actor.PID) bool) inf.IBus {
 	return endpoints.GetEndpointManager().SelectByRule(h.GetPID(), rule)
 }
+
+func (h *Handler) SelectByNodeType(nodeType, serviceName string) inf.IBus {
+	return endpoints.GetEndpointManager().SelectByNodeType(h.GetPID(), nodeType, serviceName)
+}

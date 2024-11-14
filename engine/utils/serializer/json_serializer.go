@@ -3,7 +3,6 @@ package serializer
 import (
 	"bytes"
 	"fmt"
-	"github.com/njtc406/chaosengine/engine/cluster/endpoints"
 	"reflect"
 
 	"github.com/gogo/protobuf/jsonpb"
@@ -25,7 +24,7 @@ func newJsonSerializer() Serializer {
 }
 
 func (j *jsonSerializer) Serialize(msg interface{}) ([]byte, error) {
-	if message, ok := msg.(*endpoints.JsonMessage); ok {
+	if message, ok := msg.(*JsonMessage); ok {
 		return []byte(message.Json), nil
 	} else if message, ok := msg.(proto.Message); ok {
 
@@ -42,7 +41,7 @@ func (j *jsonSerializer) Serialize(msg interface{}) ([]byte, error) {
 func (j *jsonSerializer) Deserialize(typeName string, b []byte) (interface{}, error) {
 	protoType := proto.MessageType(typeName)
 	if protoType == nil {
-		m := &endpoints.JsonMessage{
+		m := &JsonMessage{
 			TypeName: typeName,
 			Json:     string(b),
 		}
@@ -63,7 +62,7 @@ func (j *jsonSerializer) Deserialize(typeName string, b []byte) (interface{}, er
 }
 
 func (j *jsonSerializer) GetTypeName(msg interface{}) (string, error) {
-	if message, ok := msg.(*endpoints.JsonMessage); ok {
+	if message, ok := msg.(*JsonMessage); ok {
 		return message.TypeName, nil
 	} else if message, ok := msg.(proto.Message); ok {
 		typeName := proto.MessageName(message)

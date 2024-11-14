@@ -5,7 +5,7 @@
 // @Update  pc  2024/11/5
 package discovery
 
-import "github.com/njtc406/chaosengine/engine1/log"
+import "github.com/njtc406/chaosengine/engine/utils/log"
 
 // LogWriter 日志输出(这个是给etcd的client使用的,可以输出内部的日志,目前先不用)
 type LogWriter struct {

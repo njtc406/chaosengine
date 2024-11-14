@@ -7,7 +7,9 @@ package monitor
 
 import (
 	"fmt"
+	"github.com/njtc406/chaosengine/engine/def"
 	"github.com/njtc406/chaosengine/engine/errdef"
+	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/msgenvelope"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"sync"
@@ -21,7 +23,7 @@ type RpcMonitor struct {
 	closed  chan struct{}
 	locker  sync.Mutex
 	seed    uint64
-	waitMap map[uint64]*msgenvelope.MsgEnvelope
+	waitMap map[uint64]inf.IEnvelope
 	th      CallTimerHeap // 由于请求很频繁,所以这里使用单独的timer来处理
 	ticker  *time.Ticker
 }
@@ -35,7 +37,7 @@ func GetRpcMonitor() *RpcMonitor {
 
 func (rm *RpcMonitor) Init() {
 	rm.closed = make(chan struct{})
-	rm.waitMap = make(map[uint64]*msgenvelope.MsgEnvelope)
+	rm.waitMap = make(map[uint64]inf.IEnvelope)
 	rm.th.Init()
 	rm.ticker = time.NewTicker(time.Millisecond * 100)
 }
@@ -90,19 +92,19 @@ func (rm *RpcMonitor) GenSeq() uint64 {
 	return atomic.AddUint64(&rm.seed, 1)
 }
 
-func (rm *RpcMonitor) Add(f *msgenvelope.MsgEnvelope) {
+func (rm *RpcMonitor) Add(envelope inf.IEnvelope) {
 	rm.locker.Lock()
 	defer rm.locker.Unlock()
 
-	id := f.GetReqID()
+	id := envelope.GetReqId()
 	if id == 0 {
 		return
 	}
-	rm.waitMap[id] = f
-	rm.th.AddTimer(id, f.GetTimeout())
+	rm.waitMap[id] = envelope
+	rm.th.AddTimer(id, envelope.GetTimeout())
 }
 
-func (rm *RpcMonitor) remove(id uint64) *msgenvelope.MsgEnvelope {
+func (rm *RpcMonitor) remove(id uint64) inf.IEnvelope {
 	f, ok := rm.waitMap[id]
 	if !ok {
 		return nil
@@ -113,7 +115,7 @@ func (rm *RpcMonitor) remove(id uint64) *msgenvelope.MsgEnvelope {
 	return f
 }
 
-func (rm *RpcMonitor) Remove(id uint64) *msgenvelope.MsgEnvelope {
+func (rm *RpcMonitor) Remove(id uint64) inf.IEnvelope {
 	if id == 0 {
 		return nil
 	}
@@ -123,37 +125,36 @@ func (rm *RpcMonitor) Remove(id uint64) *msgenvelope.MsgEnvelope {
 	return f
 }
 
-func (rm *RpcMonitor) Get(id uint64) *msgenvelope.MsgEnvelope {
+func (rm *RpcMonitor) Get(id uint64) inf.IEnvelope {
 	rm.locker.Lock()
 	defer rm.locker.Unlock()
 
 	return rm.waitMap[id]
 }
 
-func (rm *RpcMonitor) futureCallTimeout(envelope *msgenvelope.MsgEnvelope) {
+func (rm *RpcMonitor) futureCallTimeout(envelope inf.IEnvelope) {
 	if !envelope.IsRef() {
 		log.SysLogger.Errorf("future is not ref,pid:%s", envelope.GetSender().String())
 		return // 已经被释放,丢弃
 	}
 
-	envelope.Response = nil
-	envelope.Err = errdef.RPCCallTimeout
+	envelope.SetResponse(nil)
+	envelope.SetError(errdef.RPCCallTimeout)
 
 	if envelope.NeedCallback() {
-		// 获取send
-		client := envelope.SenderClient
-		if client == nil {
-			log.SysLogger.Errorf("rpc call timeout, but sender client is nil,pid:%s", envelope.GetSender().String())
-			msgenvelope.ReleaseMsgEnvelope(envelope)
-			return
-		}
 		// (这里的envelope会在两个地方回收,如果是本地调用,那么会在requestHandler执行完成后自动回收
 		// 如果是远程调用,那么在远程client将消息发送完成后自动回收)
-		if err := client.PushRequest(envelope); err != nil {
+		if err := envelope.GetSenderClient().PushRequest(envelope); err != nil {
 			msgenvelope.ReleaseMsgEnvelope(envelope)
 			log.SysLogger.Errorf("send call timeout response error:%s", err.Error())
 		}
+	} else {
+		envelope.Done()
 	}
+}
 
-	envelope.Done()
+func (rm *RpcMonitor) NewCancel(id uint64) def.CancelRpc {
+	return func() {
+		rm.Remove(id)
+	}
 }

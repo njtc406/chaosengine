@@ -3,7 +3,7 @@ package event
 import (
 	"fmt"
 	"github.com/njtc406/chaosengine/engine/utils/log"
-	"github.com/njtc406/chaosengine/engine/utils/synclib"
+	"github.com/njtc406/chaosengine/engine/utils/pool"
 	"runtime"
 	"sync"
 )
@@ -245,7 +245,7 @@ func (processor *EventProcessor) castEvent(event IEvent) {
 	}
 }
 
-var eventPool = synclib.NewPoolEx(make(chan synclib.IPoolData, 10240), func() synclib.IPoolData {
+var eventPool = pool.NewPoolEx(make(chan pool.IPoolData, 10240), func() pool.IPoolData {
 	return &Event{}
 })
 

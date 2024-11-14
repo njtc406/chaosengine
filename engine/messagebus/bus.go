@@ -7,70 +7,88 @@ package messagebus
 
 import (
 	"fmt"
-	"github.com/njtc406/chaosengine/engine/actor"
 	"github.com/njtc406/chaosengine/engine/def"
+	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/inf"
+	"github.com/njtc406/chaosengine/engine/monitor"
 	"github.com/njtc406/chaosengine/engine/msgenvelope"
 	"github.com/njtc406/chaosengine/engine/utils/errorlib"
 	"github.com/njtc406/chaosengine/engine/utils/log"
-	"github.com/njtc406/chaosengine/engine1/synclib"
+	"github.com/njtc406/chaosengine/engine/utils/pool"
 	"reflect"
 	"time"
 )
 
 type MessageBus struct {
-	synclib.DataRef
-	sender         *actor.PID
-	receiverClient inf.IClient
+	def.DataRef
+	senderClient   inf.IRpcSender
+	receiverClient inf.IRpcSender
 }
 
 func (mb *MessageBus) Reset() {
-	mb.sender = nil
+	mb.senderClient = nil
 	mb.receiverClient = nil
 }
 
-var pool = synclib.NewPoolEx(make(chan synclib.IPoolData, 2048), func() synclib.IPoolData {
+var busPool = pool.NewPoolEx(make(chan pool.IPoolData, 2048), func() pool.IPoolData {
 	return &MessageBus{}
 })
 
-func NewMessageBus(sender *actor.PID, receiver inf.IClient) *MessageBus {
-	mb := pool.Get().(*MessageBus)
-	mb.sender = sender
+func NewMessageBus(sender inf.IRpcSender, receiver inf.IRpcSender) *MessageBus {
+	mb := busPool.Get().(*MessageBus)
+	mb.senderClient = sender
 	mb.receiverClient = receiver
 	return mb
 }
 
 func ReleaseMessageBus(mb *MessageBus) {
-	pool.Put(mb)
+	busPool.Put(mb)
 }
 
-// Call 同步调用服务
-func (mb *MessageBus) Call(method string, in, out interface{}) error {
-	if mb.sender == nil || mb.receiverClient == nil {
-		return fmt.Errorf("sender or receiver is nil")
+func (mb *MessageBus) call(method string, timeout time.Duration, in, out interface{}) error {
+	if mb.senderClient == nil || mb.receiverClient == nil {
+		return fmt.Errorf("senderClient or receiver is nil")
 	}
 
-	// 封装消息
-	envelope := msgenvelope.NewMsgEnvelope()
-	envelope.Method = method
-	envelope.Sender = mb.sender
-	envelope.Receiver = mb.receiverClient.GetPID()
-	envelope.ReqID = mb.receiverClient.GenSeq()
-	envelope.Request = in
-	envelope.NeedResp = true
-	envelope.Timeout = def.DefaultRpcTimeout // TODO 暂时不支持没有超时时间的调用,风险太高,容易造成服务阻塞
+	mt := monitor.GetRpcMonitor()
 
-	defer msgenvelope.ReleaseMsgEnvelope(envelope) // 释放资源
+	// 创建请求
+	envelope := msgenvelope.NewMsgEnvelope()
+	envelope.SetMethod(method)
+	envelope.SetSender(mb.senderClient.GetPID())
+	envelope.SetReceiver(mb.receiverClient.GetPID())
+	envelope.SetSenderClient(mb.senderClient)
+	envelope.SetRequest(in)
+	envelope.SetResponse(nil) // 容错
+	envelope.SetReqId(mt.GenSeq())
+	envelope.SetNeedResponse(true)
+	envelope.SetTimeout(timeout)
 
 	// 加入等待队列
-	mb.receiverClient.Add(envelope)
-	// 发送消息
-	mb.receiverClient.SendMessageWithFuture(envelope)
+	mt.Add(envelope)
 
-	resp, err := envelope.Result()
-	if err != nil {
+	// 发送消息
+	if err := mb.receiverClient.SendRequest(envelope); err != nil {
+		// 发送失败,释放资源
+		mt.Remove(envelope.GetReqId())
+		msgenvelope.ReleaseMsgEnvelope(envelope)
+		log.SysLogger.Errorf("service[%s] send message[%s] request to client failed, error: %v", mb.senderClient.GetName(), envelope.GetMethod(), err)
+		return errdef.RPCCallFailed
+	}
+
+	// 等待回复
+	envelope.Wait()
+
+	mt.Remove(envelope.GetReqId()) // 容错,不管有没有释放,都释放一次(实际上在所有设置done之前都会释放)
+
+	if err := envelope.GetError(); err != nil {
 		return err
 	}
+
+	resp := envelope.GetResponse()
+
+	// 获取到返回后直接释放
+	msgenvelope.ReleaseMsgEnvelope(envelope)
 
 	if reflect.TypeOf(out) != reflect.TypeOf(resp) {
 		return fmt.Errorf("call: type not match, expected %v but got %v", reflect.TypeOf(out), reflect.TypeOf(resp))
@@ -80,96 +98,93 @@ func (mb *MessageBus) Call(method string, in, out interface{}) error {
 
 	return nil
 }
+
+// Call 同步调用服务
+func (mb *MessageBus) Call(method string, in, out interface{}) error {
+	return mb.call(method, def.DefaultRpcTimeout, in, out)
+}
 func (mb *MessageBus) CallWithTimeout(method string, timeout time.Duration, in, out interface{}) error {
-	if mb.sender == nil || mb.receiverClient == nil {
-		return fmt.Errorf("sender or receiver is nil")
-	}
-
-	if timeout == 0 {
-		timeout = def.DefaultRpcTimeout
-	}
-	// 封装消息
-	envelope := msgenvelope.NewMsgEnvelope()
-	envelope.Method = method
-	envelope.Sender = mb.sender
-	envelope.Receiver = mb.receiverClient.GetPID()
-	envelope.ReqID = mb.receiverClient.GenSeq()
-	envelope.Request = in
-	envelope.NeedResp = true
-	envelope.Timeout = timeout
-
-	mb.receiverClient.SendMessageWithFuture(envelope)
-
-	resp, err := envelope.Result()
-	if err != nil {
-		return err
-	}
-
-	if reflect.TypeOf(out) != reflect.TypeOf(resp) {
-		return fmt.Errorf("callWithTimeout: type not match, expected %v but got %v", reflect.TypeOf(out), reflect.TypeOf(resp))
-	}
-
-	reflect.ValueOf(out).Elem().Set(reflect.ValueOf(resp))
-
-	return nil
+	return mb.call(method, timeout, in, out)
 }
 
 // AsyncCall 异步调用服务
-func (mb *MessageBus) AsyncCall(method string, timeout time.Duration, callbacks []msgenvelope.CompletionFunc, in interface{}) (inf.CancelRpc, error) {
-	if mb.sender == nil || mb.receiverClient == nil {
-		return inf.EmptyCancelRpc, fmt.Errorf("sender or receiver is nil")
+func (mb *MessageBus) AsyncCall(method string, timeout time.Duration, callbacks []def.CompletionFunc, in interface{}) (def.CancelRpc, error) {
+	if mb.senderClient == nil || mb.receiverClient == nil {
+		return def.EmptyCancelRpc, fmt.Errorf("senderClient or receiver is nil")
 	}
 
-	if timeout == 0 {
-		timeout = def.DefaultRpcTimeout
-	}
+	mt := monitor.GetRpcMonitor()
 
-	// 封装消息
+	// 创建请求
 	envelope := msgenvelope.NewMsgEnvelope()
-	envelope.Method = method
-	envelope.Sender = mb.sender
-	envelope.Receiver = mb.receiverClient.GetPID()
-	envelope.ReqID = mb.receiverClient.GenSeq()
-	envelope.Request = in
-	envelope.NeedResp = true
+	envelope.SetMethod(method)
+	envelope.SetSender(mb.senderClient.GetPID())
+	envelope.SetReceiver(mb.receiverClient.GetPID())
+	envelope.SetSenderClient(mb.senderClient)
+	envelope.SetRequest(in)
+	envelope.SetResponse(nil) // 容错
+	envelope.SetReqId(mt.GenSeq())
+	envelope.SetNeedResponse(true)
+	envelope.SetTimeout(timeout)
+	envelope.SetCallback(callbacks)
 
-	return mb.receiverClient.AsyncSendMessage(envelope, timeout, callbacks)
+	// 加入等待队列
+	mt.Add(envelope)
+
+	// 发送消息,最终callback调用将在response中被执行,所以envelope会在callback执行完后自动回收
+	if err := mb.receiverClient.SendRequest(envelope); err != nil {
+		// 发送失败,释放资源
+		mt.Remove(envelope.GetReqId())
+		msgenvelope.ReleaseMsgEnvelope(envelope)
+		log.SysLogger.Errorf("service[%s] send message[%s] request to client failed, error: %v", mb.senderClient.GetName(), envelope.GetMethod(), err)
+		return def.EmptyCancelRpc, errdef.RPCCallFailed
+	}
+
+	return mt.NewCancel(envelope.GetReqId()), nil
 }
 
 // Send 无返回调用
 func (mb *MessageBus) Send(method string, in interface{}) error {
 	if mb.receiverClient == nil {
-		return fmt.Errorf("receiver is nil")
+		return fmt.Errorf("senderClient or receiver is nil")
 	}
-	envelope := msgenvelope.NewMsgEnvelope()
-	envelope.Method = method
-	envelope.Sender = mb.sender
-	envelope.Receiver = mb.receiverClient.GetPID()
-	envelope.ReqID = mb.receiverClient.GenSeq()
-	envelope.Request = in
-	envelope.NeedResp = false
 
-	return mb.receiverClient.SendMessage(envelope)
+	mt := monitor.GetRpcMonitor()
+
+	// 创建请求
+	envelope := msgenvelope.NewMsgEnvelope()
+	envelope.SetMethod(method)
+	envelope.SetReceiver(mb.receiverClient.GetPID())
+	envelope.SetSenderClient(mb.senderClient)
+	envelope.SetRequest(in)
+	envelope.SetResponse(nil) // 容错
+	envelope.SetReqId(mt.GenSeq())
+	envelope.SetNeedResponse(false) // 不需要回复
+
+	// 如果是远程调用, 则由远程调用释放资源,如果是本地调用,则由接收者自行回收
+	return mb.receiverClient.SendRequestAndRelease(envelope)
 }
 
 // Cast 广播调用(实际和send是一样的)
 func (mb *MessageBus) Cast(method string, in interface{}) error {
 	if mb.receiverClient == nil {
-		return fmt.Errorf("receiver is nil")
+		return fmt.Errorf("senderClient or receiver is nil")
 	}
+
+	mt := monitor.GetRpcMonitor()
+
+	// 创建请求
 	envelope := msgenvelope.NewMsgEnvelope()
-	envelope.Method = method
-	envelope.Sender = mb.sender
-	envelope.Receiver = mb.receiverClient.GetPID()
-	envelope.ReqID = mb.receiverClient.GenSeq()
-	envelope.Request = in
-	envelope.NeedResp = false
+	envelope.SetMethod(method)
+	envelope.SetReceiver(mb.receiverClient.GetPID())
+	envelope.SetSenderClient(mb.senderClient)
+	envelope.SetRequest(in)
+	envelope.SetResponse(nil) // 容错
+	envelope.SetReqId(mt.GenSeq())
+	envelope.SetNeedResponse(false) // 不需要回复
 
-	return mb.receiverClient.SendMessage(envelope)
-}
-
-func (mb *MessageBus) Response(envelope *msgenvelope.MsgEnvelope) error {
-	return mb.receiverClient.SendMessage(envelope)
+	// 如果是远程调用, 则由远程调用释放资源,如果是本地调用,则由接收者自行回收
+	return mb.receiverClient.SendRequestAndRelease(envelope)
 }
 
 // TODO 这个还需要修改
@@ -213,17 +228,17 @@ func (m MultiBus) CallWithTimeout(serviceMethod string, timeout time.Duration, i
 	return m[0].CallWithTimeout(serviceMethod, timeout, in, out)
 }
 
-func (m MultiBus) AsyncCall(serviceMethod string, timeout time.Duration, callbacks []msgenvelope.CompletionFunc, in interface{}) (inf.CancelRpc, error) {
+func (m MultiBus) AsyncCall(serviceMethod string, timeout time.Duration, callbacks []def.CompletionFunc, in interface{}) (def.CancelRpc, error) {
 	if len(m) == 0 {
 		log.SysLogger.Errorf("===========select empty service to async call %s", serviceMethod)
-		return inf.EmptyCancelRpc, nil
+		return def.EmptyCancelRpc, nil
 	}
 	if len(m) > 1 {
 		// 释放所有节点
 		for _, bus := range m {
 			ReleaseMessageBus(bus.(*MessageBus))
 		}
-		return inf.EmptyCancelRpc, fmt.Errorf("only one node can be called at a time, now got %v", len(m))
+		return def.EmptyCancelRpc, fmt.Errorf("only one node can be called at a time, now got %v", len(m))
 	}
 	// call只允许调用一个节点
 	return m[0].AsyncCall(serviceMethod, timeout, callbacks, in)
@@ -257,12 +272,4 @@ func (m MultiBus) Cast(serviceMethod string, in interface{}) error {
 	}
 
 	return errorlib.CombineErr(errs...)
-}
-
-func (m MultiBus) Response(envelope *msgenvelope.MsgEnvelope) error {
-	if len(m) != 1 {
-		return fmt.Errorf("response bus must be one, but got %v", len(m))
-	}
-
-	return m[0].Response(envelope)
 }

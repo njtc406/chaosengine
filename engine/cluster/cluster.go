@@ -41,7 +41,7 @@ func (c *Cluster) initConfig(confPath string) {
 	c.conf = config.Init(confPath)
 }
 
-func (c *Cluster) Init(nodeUID string, confPath string) {
+func (c *Cluster) Init(nodeId int32, nodeType, confPath string) {
 	// 加载集群配置
 	c.initConfig(confPath)
 
@@ -51,7 +51,7 @@ func (c *Cluster) Init(nodeUID string, confPath string) {
 	c.eventProcessor.Init(c)
 
 	c.endpoints = endpoints.GetEndpointManager()
-	c.endpoints.Init(nodeUID, c.conf.RPCServer.Addr, c.eventProcessor)
+	c.endpoints.Init(nodeId, nodeType, c.conf.RPCServer.Addr, c.eventProcessor)
 
 	c.discovery = discovery.NewDiscovery()
 	if err := c.discovery.Init(c.conf.ETCDConf, c.eventProcessor); err != nil {
