@@ -19,7 +19,7 @@ var (
 type ConfInfo struct {
 	ServiceName   string             // 服务名称
 	ConfName      string             // 配置文件名称
-	ConfPath      string             // 配置文件路径
+	ConfPath      string             // 配置文件路径(这个路径是基于node.Start传入的路径)
 	ConfType      string             // 配置文件类型
 	Cfg           interface{}        // 配置结构体
 	DefaultSetFun func(*viper.Viper) // 默认配置函数
@@ -27,7 +27,7 @@ type ConfInfo struct {
 
 func Init(nodeConfigPath string) {
 	parseNodeConfig(nodeConfigPath)
-	parseServiceConf()
+	parseServiceConf(nodeConfigPath)
 	initDir()
 }
 
@@ -102,16 +102,16 @@ func fixConf() {
 }
 
 // parseServiceConf 解析服务配置文件
-func parseServiceConf() {
+func parseServiceConf(confPath string) {
 	for _, v := range mapConf {
 		if v.Cfg == nil {
 			continue
 		}
 		parser := viper.New()
 		// 设置配置文件
-		parser.SetConfigType(v.ConfType) // 配置文件类型
-		parser.SetConfigName(v.ConfName) // 配置文件名称
-		parser.AddConfigPath(v.ConfPath) // 配置文件路径
+		parser.SetConfigType(v.ConfType)                      // 配置文件类型
+		parser.SetConfigName(v.ConfName)                      // 配置文件名称
+		parser.AddConfigPath(path.Join(confPath, v.ConfPath)) // 配置文件路径
 		executeDefaultSet(parser)
 		parseSystemConfig(parser, v.Cfg)
 	}

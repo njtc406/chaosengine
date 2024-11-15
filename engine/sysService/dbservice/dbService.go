@@ -9,6 +9,7 @@ import (
 	"github.com/njtc406/chaosengine/engine/core"
 	"github.com/njtc406/chaosengine/engine/node"
 	nodeConfig "github.com/njtc406/chaosengine/engine/node/config"
+
 	"github.com/njtc406/chaosengine/engine/sysModule/mysqlmodule"
 	"github.com/njtc406/chaosengine/engine/sysModule/redismodule"
 	"github.com/njtc406/chaosengine/engine/sysService/dbservice/config"
@@ -19,18 +20,16 @@ import (
 	"time"
 )
 
-var GlobalDBService = &DBService{}
-
 func init() {
-	node.SetupBase(GlobalDBService)
-}
-
-func OrmDB() *gorm.DB {
-	return GlobalDBService.mysqlModule.GetClient()
-}
-
-func RedisDB() *redis.Client {
-	return GlobalDBService.redisModule.GetClient()
+	node.SetupBase(&DBService{})
+	nodeConfig.RegisterConf(&nodeConfig.ConfInfo{
+		ServiceName:   "DBService",
+		ConfName:      "db",
+		ConfType:      "yaml",
+		ConfPath:      "",
+		Cfg:           &config.DBService{},
+		DefaultSetFun: config.DefaultDBService,
+	})
 }
 
 type Callback func(rdb *redis.Client, mdb *gorm.DB, args ...interface{}) (interface{}, error)
