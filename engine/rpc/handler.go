@@ -99,13 +99,10 @@ func (h *Handler) suitableMethods(method reflect.Method) error {
 	for i := 0; i < method.Type.NumOut(); i++ {
 		t := method.Type.Out(i)
 		outs = append(outs, t)
-
-		if t.Kind() == reflect.Ptr ||
-			t.Kind() == reflect.Interface ||
-			t.Kind() == reflect.Func ||
-			t.Kind() == reflect.Map ||
-			t.Kind() == reflect.Slice ||
-			t.Kind() == reflect.Chan {
+		kd := t.Kind()
+		if kd == reflect.Ptr || kd == reflect.Interface ||
+			kd == reflect.Func || kd == reflect.Map ||
+			kd == reflect.Slice || kd == reflect.Chan {
 			if t.Implements(reflect.TypeOf((*error)(nil)).Elem()) {
 				continue
 			} else {

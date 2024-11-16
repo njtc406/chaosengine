@@ -52,15 +52,21 @@ func (mb *MessageBus) call(method string, timeout time.Duration, in, out interfa
 
 	switch out.(type) {
 	case []interface{}:
-		// 本地调用,接收多参数返回值,那么所有的接收参数都必须是指针
+		// 远程调用都是固定的proto消息,不会出现这个类型的参数
+		// 本地调用,接收多参数返回值,那么所有的接收参数都必须是指针或者引用类型
 		for i, v := range out.([]interface{}) {
 			kd := reflect.TypeOf(v).Kind()
-			if kd != reflect.Ptr {
+			if kd == reflect.Ptr || kd == reflect.Interface ||
+				kd == reflect.Func || kd == reflect.Map ||
+				kd == reflect.Slice || kd == reflect.Chan {
 				return fmt.Errorf("multi out call: all out params must be pointer, but the %v one got %v", i, kd)
 			}
 		}
 	default:
-		if reflect.TypeOf(out).Kind() != reflect.Ptr {
+		kd := reflect.TypeOf(out).Kind()
+		if kd == reflect.Ptr || kd == reflect.Interface ||
+			kd == reflect.Func || kd == reflect.Map ||
+			kd == reflect.Slice || kd == reflect.Chan {
 			return fmt.Errorf("single out call: out param must be pointer")
 		}
 	}
