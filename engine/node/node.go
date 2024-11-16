@@ -7,10 +7,12 @@ package node
 
 import (
 	"github.com/njtc406/chaosengine/engine/cluster"
+	"github.com/njtc406/chaosengine/engine/def"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/monitor"
 	"github.com/njtc406/chaosengine/engine/node/config"
 	"github.com/njtc406/chaosengine/engine/services"
+	serviceConf "github.com/njtc406/chaosengine/engine/services/config"
 	"github.com/njtc406/chaosengine/engine/utils/asynclib"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/njtc406/chaosengine/engine/utils/pid"
@@ -54,6 +56,7 @@ func Start(v string, confPath string) {
 	// TODO: 这里后面如果加入集群,那么需要从集群中获取节点配置
 	// 初始化节点配置
 	config.Init(confPath)
+
 	// 初始化日志
 	log.Init(config.Conf.GetSystemLoggerFileName(), config.Conf.SystemLogger, config.IsDebug())
 
@@ -80,8 +83,11 @@ func Start(v string, confPath string) {
 		f()
 	}
 
+	// 加载服务配置
+	servicesConfig := serviceConf.Init(confPath)
+
 	// 执行节点初始化
-	initNode()
+	initNode(servicesConfig)
 
 	// 启动服务
 	services.Start()
@@ -109,17 +115,17 @@ func Start(v string, confPath string) {
 	log.Close()
 }
 
-func initNode() {
+func initNode(serviceConfig map[string]*def.ServiceInitConf) {
 	// TODO: 这里还是有点问题,基础服务中如果有db服务,那么db服务需要最先初始化,并且最后被关闭,否则可能在服务器关闭的时候会出问题
 	// 先加载基础服务
 	for _, s := range baseSetupService {
-		s.Init(s, config.GetConf(s.GetName()))
+		s.Init(s, serviceConfig[s.GetName()], config.GetConf(s.GetName()))
 		services.Setup(s)
 	}
 
 	// 顺序加载服务
 	for _, s := range preSetupService {
-		s.Init(s, config.GetConf(s.GetName()))
+		s.Init(s, serviceConfig[s.GetName()], config.GetConf(s.GetName()))
 		services.Setup(s)
 	}
 

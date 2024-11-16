@@ -2,12 +2,13 @@ package timer
 
 import (
 	"container/heap"
+	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/timelib"
 	"sync"
 	"time"
 )
 
-func SetupTimer(timer ITimer) ITimer {
+func SetupTimer(timer inf.ITimer) inf.ITimer {
 	if timer.IsOpen() == true {
 		return nil
 	}
@@ -20,7 +21,7 @@ func SetupTimer(timer ITimer) ITimer {
 }
 
 func NewTimer(d time.Duration) *Timer {
-	c := make(chan ITimer, 1)
+	c := make(chan inf.ITimer, 1)
 	timer := newTimer(d, c, nil, "")
 	SetupTimer(timer)
 
@@ -32,7 +33,7 @@ func ReleaseTimer(timer *Timer) {
 }
 
 type _TimerHeap struct {
-	timers []ITimer
+	timers []inf.ITimer
 }
 
 func (h *_TimerHeap) Len() int {
@@ -48,7 +49,7 @@ func (h *_TimerHeap) Swap(i, j int) {
 }
 
 func (h *_TimerHeap) Push(x interface{}) {
-	h.timers = append(h.timers, x.(ITimer))
+	h.timers = append(h.timers, x.(inf.ITimer))
 }
 
 func (h *_TimerHeap) Pop() (ret interface{}) {
@@ -65,7 +66,7 @@ var (
 )
 
 func StartTimer(minTimerInterval time.Duration, maxTimerNum int) {
-	timerHeap.timers = make([]ITimer, 0, maxTimerNum)
+	timerHeap.timers = make([]inf.ITimer, 0, maxTimerNum)
 	heap.Init(&timerHeap) // 初始化定时器heap
 	tickerOnce.Do(func() {
 		ticker = time.NewTicker(minTimerInterval)
@@ -107,7 +108,7 @@ func tick() {
 		return
 	}
 
-	t := heap.Pop(&timerHeap).(ITimer)
+	t := heap.Pop(&timerHeap).(inf.ITimer)
 	timerHeapLock.Unlock()
 	t.Open(false)
 	t.AppendChannel(t)

@@ -50,6 +50,27 @@ func (mb *MessageBus) call(method string, timeout time.Duration, in, out interfa
 		return fmt.Errorf("senderClient or receiver is nil")
 	}
 
+	switch out.(type) {
+	case []interface{}:
+		// 远程调用都是固定的proto消息,不会出现这个类型的参数
+		// 本地调用,接收多参数返回值,那么所有的接收参数都必须是指针或者引用类型
+		for i, v := range out.([]interface{}) {
+			kd := reflect.TypeOf(v).Kind()
+			if kd == reflect.Ptr || kd == reflect.Interface ||
+				kd == reflect.Func || kd == reflect.Map ||
+				kd == reflect.Slice || kd == reflect.Chan {
+				return fmt.Errorf("multi out call: all out params must be pointer, but the %v one got %v", i, kd)
+			}
+		}
+	default:
+		kd := reflect.TypeOf(out).Kind()
+		if kd == reflect.Ptr || kd == reflect.Interface ||
+			kd == reflect.Func || kd == reflect.Map ||
+			kd == reflect.Slice || kd == reflect.Chan {
+			return fmt.Errorf("single out call: out param must be pointer")
+		}
+	}
+
 	mt := monitor.GetRpcMonitor()
 
 	// 创建请求
@@ -90,11 +111,34 @@ func (mb *MessageBus) call(method string, timeout time.Duration, in, out interfa
 	// 获取到返回后直接释放
 	msgenvelope.ReleaseMsgEnvelope(envelope)
 
-	if reflect.TypeOf(out) != reflect.TypeOf(resp) {
-		return fmt.Errorf("call: type not match, expected %v but got %v", reflect.TypeOf(out), reflect.TypeOf(resp))
-	}
+	switch out.(type) {
+	case []interface{}:
+		respList, ok := resp.([]interface{})
+		if !ok {
+			return fmt.Errorf("call: type not match, expected %v but got %v", reflect.TypeOf(out), reflect.TypeOf(respList))
+		}
+		for idx, v := range out.([]interface{}) {
+			if reflect.TypeOf(v) != reflect.TypeOf(respList[idx]) {
+				return fmt.Errorf("call: type not match, expected %v but got %v", reflect.TypeOf(v), reflect.TypeOf(resp))
+			}
 
-	reflect.ValueOf(out).Elem().Set(reflect.ValueOf(resp))
+			reflect.ValueOf(v).Elem().Set(reflect.ValueOf(respList[idx]))
+		}
+
+		for i := 0; i < len(out.([]interface{})); i++ {
+			if reflect.TypeOf(out) != reflect.TypeOf(resp) {
+				return fmt.Errorf("call: type not match, expected %v but got %v", reflect.TypeOf(out), reflect.TypeOf(resp))
+			}
+
+			reflect.ValueOf(out).Elem().Set(reflect.ValueOf(resp))
+		}
+	default:
+		if reflect.TypeOf(out) != reflect.TypeOf(resp) {
+			return fmt.Errorf("call: type not match, expected %v but got %v", reflect.TypeOf(out), reflect.TypeOf(resp))
+		}
+
+		reflect.ValueOf(out).Elem().Set(reflect.ValueOf(resp))
+	}
 
 	return nil
 }

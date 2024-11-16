@@ -8,7 +8,7 @@ package inf
 import (
 	"github.com/njtc406/chaosengine/engine/event"
 	"github.com/njtc406/chaosengine/engine/utils/concurrent"
-	timer2 "github.com/njtc406/chaosengine/engine/utils/timer"
+	"github.com/njtc406/chaosengine/engine/utils/timer"
 	"time"
 )
 
@@ -46,11 +46,11 @@ type IModuleServiceEvent interface {
 	GetService() IService                // 获取服务
 	GetEventHandler() event.IHandler     // 获取事件处理器
 	GetEventProcessor() event.IProcessor // 获取事件管理器
-	NotifyEvent(event.IEvent)            // 通知事件
+	NotifyEvent(IEvent)                  // 通知事件
 }
 
 type IModuleTimer interface {
-	AfterFunc(d time.Duration, cb func(*timer2.Timer)) *timer2.Timer
-	CronFunc(cronExpr *timer2.CronExpr, cb func(*timer2.Cron)) *timer2.Cron
-	NewTicker(d time.Duration, cb func(*timer2.Ticker)) *timer2.Ticker
+	AfterFunc(d time.Duration, cb func(iTimer ITimer)) ITimer
+	CronFunc(cronExpr *timer.CronExpr, cb func(ITimer)) ITimer
+	NewTicker(d time.Duration, cb func(ITimer)) ITimer
 }
