@@ -16,7 +16,7 @@ func parseClusterConfig(nodeConfigPath string) map[string]*def.ServiceInitConf {
 
 	// 设置配置文件
 	parser.SetConfigType(`yaml`)         // 配置文件类型
-	parser.SetConfigName(`cluster`)      // 配置文件名称
+	parser.SetConfigName(`service`)      // 配置文件名称
 	parser.AddConfigPath(nodeConfigPath) // 配置文件路径
 
 	conf := new(config)

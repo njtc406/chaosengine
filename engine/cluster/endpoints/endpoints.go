@@ -20,8 +20,8 @@ import (
 var endMgr = &EndpointManager{}
 
 type EndpointManager struct {
-	event.IProcessor
-	event.IHandler
+	inf.IProcessor
+	inf.IHandler
 
 	remote     *remote.Remote         // 通讯器
 	stopped    bool                   // 是否已停止
@@ -32,7 +32,7 @@ func GetEndpointManager() *EndpointManager {
 	return endMgr
 }
 
-func (em *EndpointManager) Init(nodeId int32, nodeType, addr string, eventProcessor event.IProcessor) {
+func (em *EndpointManager) Init(nodeId int32, nodeType, addr string, eventProcessor inf.IProcessor) {
 	em.remote = remote.NewRemote(nodeId, nodeType, addr, new(RPCListener))
 	em.remote.Init()
 
@@ -62,7 +62,7 @@ func (em *EndpointManager) Stop() {
 }
 
 // updateServiceInfo 更新远程服务信息事件
-func (em *EndpointManager) updateServiceInfo(e event.IEvent) {
+func (em *EndpointManager) updateServiceInfo(e inf.IEvent) {
 	//log.SysLogger.Debugf("endpoints receive update service event: %+v", e)
 	ev := e.(*event.Event)
 	kv := ev.Data.(*mvccpb.KeyValue)
@@ -83,7 +83,7 @@ func (em *EndpointManager) updateServiceInfo(e event.IEvent) {
 }
 
 // removeServiceInfo 删除远程服务信息事件
-func (em *EndpointManager) removeServiceInfo(e event.IEvent) {
+func (em *EndpointManager) removeServiceInfo(e inf.IEvent) {
 	ev := e.(*event.Event)
 	kv := ev.Data.(*mvccpb.KeyValue)
 	if kv.Value != nil {

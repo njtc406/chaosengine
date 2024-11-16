@@ -14,9 +14,7 @@ type Handler func(engine *gin.RouterGroup)
 type StaticHandler func(engine *gin.Engine, group string)
 
 const (
-	DefaultGroup            = `/api/v1`
-	DefaultIdleRpgGroup     = `/idlerpg/v1`
-	SdkCallbackIdleRpgGroup = `/callback`
+	DefaultGroup = `/api/v1`
 )
 
 type GroupHandlerPool struct {

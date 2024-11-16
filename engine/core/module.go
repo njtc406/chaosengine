@@ -32,10 +32,10 @@ type Module struct {
 	root         inf.IModule            // 根模块
 	rootContains map[uint32]inf.IModule // 根模块下所有模块(包括所有的子模块)
 
-	mapActiveTimer   map[inf.ITimer]struct{} // 活跃定时器
-	mapActiveIDTimer map[uint64]inf.ITimer   // 活跃定时器id
+	mapActiveTimer   map[timer.ITimer]struct{} // 活跃定时器
+	mapActiveIDTimer map[uint64]timer.ITimer   // 活跃定时器id
 
-	eventHandler event.IHandler // 事件处理器
+	eventHandler inf.IHandler // 事件处理器
 
 	timerDispatcher *timer.Dispatcher
 }
@@ -134,11 +134,11 @@ func (m *Module) GetService() inf.IService {
 	return m.GetRoot().(inf.IService)
 }
 
-func (m *Module) GetEventProcessor() event.IProcessor {
+func (m *Module) GetEventProcessor() inf.IProcessor {
 	return m.eventHandler.GetEventProcessor()
 }
 
-func (m *Module) GetEventHandler() event.IHandler {
+func (m *Module) GetEventHandler() inf.IHandler {
 	return m.eventHandler
 }
 
@@ -192,40 +192,40 @@ func (m *Module) NotifyEvent(e inf.IEvent) {
 	m.eventHandler.NotifyEvent(e)
 }
 
-func (m *Module) OnCloseTimer(t inf.ITimer) {
+func (m *Module) OnCloseTimer(t timer.ITimer) {
 	delete(m.mapActiveIDTimer, t.GetId())
 	delete(m.mapActiveTimer, t)
 }
 
-func (m *Module) OnAddTimer(t inf.ITimer) {
+func (m *Module) OnAddTimer(t timer.ITimer) {
 	if t != nil {
 		if m.mapActiveTimer == nil {
-			m.mapActiveTimer = map[inf.ITimer]struct{}{}
+			m.mapActiveTimer = map[timer.ITimer]struct{}{}
 		}
 
 		m.mapActiveTimer[t] = struct{}{}
 	}
 }
 
-func (m *Module) AfterFunc(d time.Duration, cb func(inf.ITimer)) inf.ITimer {
+func (m *Module) AfterFunc(d time.Duration, cb func(timer.ITimer)) timer.ITimer {
 	if m.mapActiveTimer == nil {
-		m.mapActiveTimer = map[inf.ITimer]struct{}{}
+		m.mapActiveTimer = map[timer.ITimer]struct{}{}
 	}
 
 	return m.timerDispatcher.AfterFunc(d, nil, cb, m.OnCloseTimer, m.OnAddTimer)
 }
 
-func (m *Module) CronFunc(cronExpr *timer.CronExpr, cb func(inf.ITimer)) inf.ITimer {
+func (m *Module) CronFunc(cronExpr *timer.CronExpr, cb func(timer.ITimer)) timer.ITimer {
 	if m.mapActiveTimer == nil {
-		m.mapActiveTimer = map[inf.ITimer]struct{}{}
+		m.mapActiveTimer = map[timer.ITimer]struct{}{}
 	}
 
 	return m.timerDispatcher.CronFunc(cronExpr, nil, cb, m.OnCloseTimer, m.OnAddTimer)
 }
 
-func (m *Module) NewTicker(d time.Duration, cb func(inf.ITimer)) inf.ITimer {
+func (m *Module) NewTicker(d time.Duration, cb func(timer.ITimer)) timer.ITimer {
 	if m.mapActiveTimer == nil {
-		m.mapActiveTimer = map[inf.ITimer]struct{}{}
+		m.mapActiveTimer = map[timer.ITimer]struct{}{}
 	}
 
 	return m.timerDispatcher.TickerFunc(d, nil, cb, m.OnCloseTimer, m.OnAddTimer)
@@ -250,7 +250,7 @@ func (m *Module) GenTimerId() uint64 {
 
 func (m *Module) SafeAfterFunc(timerId *uint64, d time.Duration, AdditionData interface{}, cb func(uint64, interface{})) {
 	if m.mapActiveIDTimer == nil {
-		m.mapActiveIDTimer = map[uint64]inf.ITimer{}
+		m.mapActiveIDTimer = map[uint64]timer.ITimer{}
 	}
 
 	if *timerId != 0 {
@@ -266,7 +266,7 @@ func (m *Module) SafeAfterFunc(timerId *uint64, d time.Duration, AdditionData in
 
 func (m *Module) SafeCronFunc(cronId *uint64, cronExpr *timer.CronExpr, AdditionData interface{}, cb func(uint64, interface{})) {
 	if m.mapActiveIDTimer == nil {
-		m.mapActiveIDTimer = map[uint64]inf.ITimer{}
+		m.mapActiveIDTimer = map[uint64]timer.ITimer{}
 	}
 
 	*cronId = m.GenTimerId()
@@ -278,7 +278,7 @@ func (m *Module) SafeCronFunc(cronId *uint64, cronExpr *timer.CronExpr, Addition
 
 func (m *Module) SafeNewTicker(tickerId *uint64, d time.Duration, AdditionData interface{}, cb func(uint64, interface{})) {
 	if m.mapActiveIDTimer == nil {
-		m.mapActiveIDTimer = map[uint64]inf.ITimer{}
+		m.mapActiveIDTimer = map[uint64]timer.ITimer{}
 	}
 
 	*tickerId = m.GenTimerId()

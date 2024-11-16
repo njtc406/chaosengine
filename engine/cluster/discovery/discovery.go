@@ -7,6 +7,7 @@ package discovery
 
 import (
 	"context"
+	"github.com/njtc406/chaosengine/engine/inf"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -66,8 +67,8 @@ func releaseWatcherInfo(watcher *watcherInfo) {
 }
 
 type Discovery struct {
-	event.IProcessor
-	event.IHandler
+	inf.IProcessor
+	inf.IHandler
 
 	closed     bool
 	watching   int32
@@ -81,7 +82,7 @@ func NewDiscovery() *Discovery {
 	return &Discovery{}
 }
 
-func (d *Discovery) Init(conf *config.ETCDConf, eventProcessor event.IProcessor) (err error) {
+func (d *Discovery) Init(conf *config.ETCDConf, eventProcessor inf.IProcessor) (err error) {
 	d.IProcessor = eventProcessor
 	d.IHandler = event.NewHandler()
 	d.IHandler.Init(d.IProcessor)
@@ -270,7 +271,7 @@ func (d *Discovery) keepaliveForever(watcher *watcherInfo) {
 	}
 }
 
-func (d *Discovery) addService(ev event.IEvent) {
+func (d *Discovery) addService(ev inf.IEvent) {
 	if d.closed || d.client == nil {
 		return
 	}
@@ -308,7 +309,7 @@ func (d *Discovery) addService(ev event.IEvent) {
 		}
 	}
 }
-func (d *Discovery) removeService(ev event.IEvent) {
+func (d *Discovery) removeService(ev inf.IEvent) {
 	if d.closed {
 		return
 	}

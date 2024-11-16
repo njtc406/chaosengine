@@ -11,6 +11,7 @@ import (
 	"github.com/njtc406/chaosengine/engine/cluster/endpoints"
 	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/event"
+	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/asynclib"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 )
@@ -33,8 +34,8 @@ type Cluster struct {
 	endpoints *endpoints.EndpointManager
 
 	// 事件
-	eventProcessor event.IProcessor
-	eventChannel   chan event.IEvent
+	eventProcessor inf.IProcessor
+	eventChannel   chan inf.IEvent
 }
 
 func (c *Cluster) initConfig(confPath string) {
@@ -46,7 +47,7 @@ func (c *Cluster) Init(nodeId int32, nodeType, confPath string) {
 	c.initConfig(confPath)
 
 	c.closed = make(chan struct{})
-	c.eventChannel = make(chan event.IEvent, 1024)
+	c.eventChannel = make(chan inf.IEvent, 1024)
 	c.eventProcessor = event.NewProcessor()
 	c.eventProcessor.Init(c)
 
@@ -73,7 +74,7 @@ func (c *Cluster) Close() {
 	c.discovery.Close()
 }
 
-func (c *Cluster) PushEvent(ev event.IEvent) error {
+func (c *Cluster) PushEvent(ev inf.IEvent) error {
 	select {
 	case c.eventChannel <- ev:
 	default:
@@ -87,7 +88,7 @@ func (c *Cluster) run() {
 		select {
 		case ev := <-c.eventChannel:
 			if ev != nil {
-				switch ev.GetEventType() {
+				switch ev.GetType() {
 				case event.SysEventETCDPut, event.SysEventETCDDel:
 					e := ev.(*event.Event)
 					c.eventProcessor.EventHandler(e)

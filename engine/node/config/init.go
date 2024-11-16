@@ -156,19 +156,15 @@ func RegisterConf(cfgs ...*ConfInfo) {
 			panic(`register conf is nil`)
 		}
 
-		if c.ServiceName == `` {
+		if c.ServiceName == "" {
 			panic(`service name is empty`)
 		}
 
-		if c.ConfName == `` {
+		if c.ConfName == "" {
 			panic(`conf name is empty`)
 		}
 
-		if c.ConfPath == `` {
-			panic(`conf path is empty`)
-		}
-
-		if c.ConfType == `` {
+		if c.ConfType == "" {
 			panic(`conf type is empty`)
 		}
 

@@ -6,30 +6,31 @@
 package event
 
 import (
+	"github.com/njtc406/chaosengine/engine/inf"
 	"sync"
 )
 
 type Handler struct {
 	sync.RWMutex
-	processor   IProcessor
-	mapRegEvent map[int]map[IProcessor]interface{}
+	processor   inf.IProcessor
+	mapRegEvent map[inf.EventType]map[inf.IProcessor]interface{}
 }
 
-func NewHandler() IHandler {
+func NewHandler() inf.IHandler {
 	return &Handler{}
 }
 
-func (h *Handler) Init(p IProcessor) {
+func (h *Handler) Init(p inf.IProcessor) {
 	h.processor = p
-	h.mapRegEvent = make(map[int]map[IProcessor]interface{})
+	h.mapRegEvent = make(map[inf.EventType]map[inf.IProcessor]interface{})
 }
 
-func (h *Handler) GetEventProcessor() IProcessor {
+func (h *Handler) GetEventProcessor() inf.IProcessor {
 	return h.processor
 }
 
-func (h *Handler) NotifyEvent(ev IEvent) {
-	h.GetEventProcessor().castEvent(ev)
+func (h *Handler) NotifyEvent(ev inf.IEvent) {
+	h.GetEventProcessor().CastEvent(ev)
 }
 
 func (h *Handler) Destroy() {
@@ -46,20 +47,20 @@ func (h *Handler) Destroy() {
 	}
 }
 
-func (h *Handler) addRegInfo(eventType int, eventProcessor IProcessor) {
+func (h *Handler) AddRegInfo(eventType inf.EventType, eventProcessor inf.IProcessor) {
 	h.Lock()
 	defer h.Unlock()
 	if h.mapRegEvent == nil {
-		h.mapRegEvent = map[int]map[IProcessor]interface{}{}
+		h.mapRegEvent = map[inf.EventType]map[inf.IProcessor]interface{}{}
 	}
 
 	if _, ok := h.mapRegEvent[eventType]; ok == false {
-		h.mapRegEvent[eventType] = map[IProcessor]interface{}{}
+		h.mapRegEvent[eventType] = map[inf.IProcessor]interface{}{}
 	}
 	h.mapRegEvent[eventType][eventProcessor] = nil
 }
 
-func (h *Handler) removeRegInfo(eventType int, eventProcessor IProcessor) {
+func (h *Handler) RemoveRegInfo(eventType inf.EventType, eventProcessor inf.IProcessor) {
 	if _, ok := h.mapRegEvent[eventType]; ok == true {
 		delete(h.mapRegEvent[eventType], eventProcessor)
 	}

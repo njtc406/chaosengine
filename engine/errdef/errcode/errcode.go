@@ -6,6 +6,8 @@
 package errcode
 
 const (
+	Ok = 0 // 正常
+
 	RpcErr                                 = 100 // rpc 错误
 	UnmarshalErr                           = 101 // 解码错误
 	RpcCallTimeout                         = 102 // rpc 调用超时

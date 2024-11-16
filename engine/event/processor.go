@@ -6,50 +6,33 @@
 package event
 
 import (
+	"github.com/njtc406/chaosengine/engine/inf"
 	"sync"
 )
 
-// CallBack 事件接受器
-type CallBack func(event IEvent)
-
-type IProcessor interface {
-	IChannel
-
-	Init(eventChannel IChannel)
-	EventHandler(ev IEvent)
-	RegEventReceiverFunc(eventType int, receiver IHandler, callback CallBack)
-	UnRegEventReceiverFun(eventType int, receiver IHandler)
-
-	castEvent(event IEvent) //广播事件
-	addBindEvent(eventType int, receiver IHandler, callback CallBack)
-	addListen(eventType int, receiver IHandler)
-	removeBindEvent(eventType int, receiver IHandler)
-	removeListen(eventType int, receiver IHandler)
-}
-
 type Processor struct {
-	IChannel
+	inf.IChannel
 
 	locker              sync.RWMutex
-	mapListenerEvent    map[int]map[IProcessor]int    //监听者信息
-	mapBindHandlerEvent map[int]map[IHandler]CallBack //收到事件处理
+	mapListenerEvent    map[inf.EventType]map[inf.IProcessor]int             //监听者信息
+	mapBindHandlerEvent map[inf.EventType]map[inf.IHandler]inf.EventCallBack //收到事件处理
 }
 
-func NewProcessor() IProcessor {
+func NewProcessor() inf.IProcessor {
 	p := &Processor{
-		mapListenerEvent:    make(map[int]map[IProcessor]int),
-		mapBindHandlerEvent: make(map[int]map[IHandler]CallBack),
+		mapListenerEvent:    make(map[inf.EventType]map[inf.IProcessor]int),
+		mapBindHandlerEvent: make(map[inf.EventType]map[inf.IHandler]inf.EventCallBack),
 	}
 	return p
 }
 
-func (p *Processor) Init(eventChannel IChannel) {
+func (p *Processor) Init(eventChannel inf.IChannel) {
 	p.IChannel = eventChannel
 }
 
 // EventHandler 事件处理
-func (p *Processor) EventHandler(ev IEvent) {
-	eventType := ev.GetEventType()
+func (p *Processor) EventHandler(ev inf.IEvent) {
+	eventType := ev.GetType()
 	mapCallBack, ok := p.mapBindHandlerEvent[eventType]
 	if !ok {
 		return
@@ -60,30 +43,30 @@ func (p *Processor) EventHandler(ev IEvent) {
 }
 
 // RegEventReceiverFunc 注册事件处理函数
-func (p *Processor) RegEventReceiverFunc(eventType int, receiver IHandler, callback CallBack) {
+func (p *Processor) RegEventReceiverFunc(eventType inf.EventType, receiver inf.IHandler, callback inf.EventCallBack) {
 	//记录receiver自己注册过的事件
-	receiver.addRegInfo(eventType, p)
+	receiver.AddRegInfo(eventType, p)
 	//记录当前所属IEventProcessor注册的回调
-	receiver.GetEventProcessor().addBindEvent(eventType, receiver, callback)
+	receiver.GetEventProcessor().AddBindEvent(eventType, receiver, callback)
 	//将注册加入到监听中
-	p.addListen(eventType, receiver)
+	p.AddListen(eventType, receiver)
 }
 
 // UnRegEventReceiverFun 取消注册
-func (p *Processor) UnRegEventReceiverFun(eventType int, receiver IHandler) {
-	p.removeListen(eventType, receiver)
-	receiver.GetEventProcessor().removeBindEvent(eventType, receiver)
-	receiver.removeRegInfo(eventType, p)
+func (p *Processor) UnRegEventReceiverFun(eventType inf.EventType, receiver inf.IHandler) {
+	p.RemoveListen(eventType, receiver)
+	receiver.GetEventProcessor().RemoveBindEvent(eventType, receiver)
+	receiver.RemoveRegInfo(eventType, p)
 }
 
 // castEvent 广播事件
-func (p *Processor) castEvent(event IEvent) {
+func (p *Processor) CastEvent(event inf.IEvent) {
 	if p.mapListenerEvent == nil {
 		//log.Error("mapListenerEvent not init!")
 		return
 	}
 
-	eventProcessor, ok := p.mapListenerEvent[event.GetEventType()]
+	eventProcessor, ok := p.mapListenerEvent[event.GetType()]
 	if ok == false || p == nil {
 		return
 	}
@@ -94,31 +77,31 @@ func (p *Processor) castEvent(event IEvent) {
 }
 
 // addListen 添加监听
-func (p *Processor) addListen(eventType int, receiver IHandler) {
+func (p *Processor) AddListen(eventType inf.EventType, receiver inf.IHandler) {
 	p.locker.Lock()
 	defer p.locker.Unlock()
 
 	if _, ok := p.mapListenerEvent[eventType]; ok == false {
-		p.mapListenerEvent[eventType] = map[IProcessor]int{}
+		p.mapListenerEvent[eventType] = map[inf.IProcessor]int{}
 	}
 
 	p.mapListenerEvent[eventType][receiver.GetEventProcessor()] += 1
 }
 
 // addBindEvent 添加绑定事件
-func (p *Processor) addBindEvent(eventType int, receiver IHandler, callback CallBack) {
+func (p *Processor) AddBindEvent(eventType inf.EventType, receiver inf.IHandler, callback inf.EventCallBack) {
 	p.locker.Lock()
 	defer p.locker.Unlock()
 
 	if _, ok := p.mapBindHandlerEvent[eventType]; ok == false {
-		p.mapBindHandlerEvent[eventType] = map[IHandler]CallBack{}
+		p.mapBindHandlerEvent[eventType] = map[inf.IHandler]inf.EventCallBack{}
 	}
 
 	p.mapBindHandlerEvent[eventType][receiver] = callback
 }
 
 // removeBindEvent 移除绑定事件
-func (p *Processor) removeBindEvent(eventType int, receiver IHandler) {
+func (p *Processor) RemoveBindEvent(eventType inf.EventType, receiver inf.IHandler) {
 	p.locker.Lock()
 	defer p.locker.Unlock()
 	if _, ok := p.mapBindHandlerEvent[eventType]; ok == true {
@@ -127,7 +110,7 @@ func (p *Processor) removeBindEvent(eventType int, receiver IHandler) {
 }
 
 // removeListen 移除监听
-func (p *Processor) removeListen(eventType int, receiver IHandler) {
+func (p *Processor) RemoveListen(eventType inf.EventType, receiver inf.IHandler) {
 	p.locker.Lock()
 	defer p.locker.Unlock()
 	if _, ok := p.mapListenerEvent[eventType]; ok == true {

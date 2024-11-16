@@ -5,8 +5,6 @@
 // @Update  yr  2024/7/19 下午3:40
 package event
 
-type EventType int
-
 const (
 
 	// 基础事件 -1000以上 系统事件 -1 到 -999  用户事件 1 - 99

@@ -2,7 +2,6 @@ package timer
 
 import (
 	"fmt"
-	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/njtc406/chaosengine/engine/utils/pool"
 	"reflect"
@@ -11,20 +10,20 @@ import (
 	"time"
 )
 
-type OnCloseTimer func(timer inf.ITimer)
-type OnAddTimer func(timer inf.ITimer)
+type OnCloseTimer func(timer ITimer)
+type OnAddTimer func(timer ITimer)
 
 // Timer 定时器
 type Timer struct {
 	Id             uint64
-	cancelled      int32           //是否关闭
-	C              chan inf.ITimer //定时器管道
-	interval       time.Duration   // 时间间隔（用于循环定时器）
-	fireTime       time.Time       // 触发时间
+	cancelled      int32         //是否关闭
+	C              chan ITimer   //定时器管道
+	interval       time.Duration // 时间间隔（用于循环定时器）
+	fireTime       time.Time     // 触发时间
 	cb             func(uint64, interface{})
-	cbEx           func(t inf.ITimer)
-	cbCronEx       func(t inf.ITimer)
-	cbTickerEx     func(t inf.ITimer)
+	cbEx           func(t ITimer)
+	cbCronEx       func(t ITimer)
+	cbTickerEx     func(t ITimer)
 	cbOnCloseTimer OnCloseTimer
 	cronExpr       *CronExpr
 	AdditionData   interface{} //定时器附加数据
@@ -55,7 +54,7 @@ var tickerPool = pool.NewPoolEx(make(chan pool.IPoolData, 10240), func() pool.IP
 	return &Ticker{}
 })
 
-func newTimer(d time.Duration, c chan inf.ITimer, cb func(uint64, interface{}), additionData interface{}) *Timer {
+func newTimer(d time.Duration, c chan ITimer, cb func(uint64, interface{}), additionData interface{}) *Timer {
 	timer := timerPool.Get().(*Timer)
 	timer.AdditionData = additionData
 	timer.C = c
@@ -90,7 +89,7 @@ func releaseCron(cron *Cron) {
 
 // Dispatcher one dispatcher per goroutine (goroutine not safe)
 type Dispatcher struct {
-	ChanTimer chan inf.ITimer
+	ChanTimer chan ITimer
 }
 
 func (t *Timer) GetId() uint64 {
@@ -105,7 +104,7 @@ func (t *Timer) Open(bOpen bool) {
 	t.rOpen = bOpen
 }
 
-func (t *Timer) AppendChannel(timer inf.ITimer) {
+func (t *Timer) AppendChannel(timer ITimer) {
 	t.C <- timer
 }
 
@@ -301,11 +300,11 @@ func (c *Ticker) UnRef() {
 
 func NewDispatcher(l int) *Dispatcher {
 	dispatcher := new(Dispatcher)
-	dispatcher.ChanTimer = make(chan inf.ITimer, l)
+	dispatcher.ChanTimer = make(chan ITimer, l)
 	return dispatcher
 }
 
-func (dp *Dispatcher) AfterFunc(d time.Duration, cb func(uint64, interface{}), cbEx func(inf.ITimer), onTimerClose OnCloseTimer, onAddTimer OnAddTimer) *Timer {
+func (dp *Dispatcher) AfterFunc(d time.Duration, cb func(uint64, interface{}), cbEx func(ITimer), onTimerClose OnCloseTimer, onAddTimer OnAddTimer) *Timer {
 	timer := newTimer(d, dp.ChanTimer, nil, nil)
 	timer.cb = cb
 	timer.cbEx = cbEx
@@ -319,7 +318,7 @@ func (dp *Dispatcher) AfterFunc(d time.Duration, cb func(uint64, interface{}), c
 	return timer
 }
 
-func (dp *Dispatcher) CronFunc(cronExpr *CronExpr, cb func(uint64, interface{}), cbEx func(inf.ITimer), onTimerClose OnCloseTimer, onAddTimer OnAddTimer) *Cron {
+func (dp *Dispatcher) CronFunc(cronExpr *CronExpr, cb func(uint64, interface{}), cbEx func(ITimer), onTimerClose OnCloseTimer, onAddTimer OnAddTimer) *Cron {
 	now := Now()
 	nextTime := cronExpr.Next(now)
 	if nextTime.IsZero() {
@@ -339,7 +338,7 @@ func (dp *Dispatcher) CronFunc(cronExpr *CronExpr, cb func(uint64, interface{}),
 	return cron
 }
 
-func (dp *Dispatcher) TickerFunc(d time.Duration, cb func(uint64, interface{}), cbEx func(inf.ITimer), onTimerClose OnCloseTimer, onAddTimer OnAddTimer) *Ticker {
+func (dp *Dispatcher) TickerFunc(d time.Duration, cb func(uint64, interface{}), cbEx func(ITimer), onTimerClose OnCloseTimer, onAddTimer OnAddTimer) *Ticker {
 	t := newTicker()
 	t.C = dp.ChanTimer
 	t.fireTime = Now().Add(d)

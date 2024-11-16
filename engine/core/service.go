@@ -43,8 +43,8 @@ type Service struct {
 	mailBox      chan inf.IEvent    // 事件队列
 	profiler     *profiler.Profiler // 性能分析
 
-	rpcHandler     rpc.Handler      // rpc处理器
-	eventProcessor event.IProcessor // 事件管理器
+	rpcHandler     rpc.Handler    // rpc处理器
+	eventProcessor inf.IProcessor // 事件管理器
 }
 
 func (s *Service) Init(svc interface{}, serviceInitConf *def.ServiceInitConf, cfg interface{}) {
