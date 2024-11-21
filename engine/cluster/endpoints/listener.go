@@ -8,7 +8,7 @@ package endpoints
 import (
 	"context"
 	"github.com/njtc406/chaosengine/engine/actor"
-	"github.com/njtc406/chaosengine/engine/def"
+	"github.com/njtc406/chaosengine/engine/dto"
 	"github.com/njtc406/chaosengine/engine/monitor"
 	"github.com/njtc406/chaosengine/engine/msgenvelope"
 	"github.com/njtc406/chaosengine/engine/utils/log"
@@ -19,7 +19,7 @@ type RPCListener struct{}
 
 // TODO 处理ReqId重复发送的问题
 
-func (rm *RPCListener) RPCCall(_ context.Context, req *actor.Message, _ *def.RPCResponse) error {
+func (rm *RPCListener) RPCCall(_ context.Context, req *actor.Message, _ *dto.RPCResponse) error {
 	if req.Reply {
 		// 回复
 		// 需要回复的信息都会加入monitor中,找到对应的信封

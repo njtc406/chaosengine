@@ -63,6 +63,8 @@ func parseNodeConfig(nodeConfigPath string) {
 		RotationTime: time.Hour * 24,
 	})
 
+	parser.SetDefault(`AntsPoolSize`, 10000)
+
 	//parser.SetDefault(`SystemLogger.Module`, `error.log`)
 	//parser.SetDefault(`SystemLogger.Level`, `error`)
 	//parser.SetDefault(`SystemLogger.Caller`, true)

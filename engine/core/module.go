@@ -28,20 +28,19 @@ type Module struct {
 
 	self         inf.IModule            // 自身
 	parent       inf.IModule            // 父模块
-	children     map[uint32]inf.IModule // 子模块列表
+	children     map[uint32]inf.IModule // 子模块列表 map[moduleId]module
 	root         inf.IModule            // 根模块
 	rootContains map[uint32]inf.IModule // 根模块下所有模块(包括所有的子模块)
 
-	mapActiveTimer   map[timer.ITimer]struct{} // 活跃定时器
-	mapActiveIDTimer map[uint64]timer.ITimer   // 活跃定时器id
-
 	eventHandler inf.IHandler // 事件处理器
 
-	timerDispatcher *timer.Dispatcher
+	timerDispatcher  *timer.Dispatcher         // 定时器调度器
+	mapActiveTimer   map[timer.ITimer]struct{} // 活跃定时器
+	mapActiveIDTimer map[uint64]timer.ITimer   // 活跃定时器id
 }
 
 func (m *Module) AddModule(module inf.IModule) (uint32, error) {
-	if module.GetEventProcessor() == nil {
+	if m.GetEventProcessor() == nil {
 		return 0, errdef.ModuleNotInitialized
 	}
 
@@ -143,16 +142,37 @@ func (m *Module) GetEventHandler() inf.IHandler {
 }
 
 func (m *Module) ReleaseAllChildModule() {
-	// 释放所有子模块(反方向释放)
-	for i := uint32(len(m.children) - 1); i >= 0; i-- {
-		module := m.children[i]
-		module.ReleaseModule(module.GetModuleID())
+	// 释放所有子模块
+	for id := range m.children {
+		m.ReleaseModule(id)
 	}
 }
 
+func (m *Module) reset() {
+	m.moduleId = 0
+	m.moduleName = ""
+	m.moduleIdSeed = 0
+	m.self = nil
+	m.parent = nil
+	m.children = nil
+	m.mapActiveTimer = nil
+	m.timerDispatcher = nil
+	m.root = nil
+	m.rootContains = nil
+	m.IRpcHandler = nil
+	m.mapActiveIDTimer = nil
+	m.eventHandler = nil
+	m.IConcurrent = nil
+}
+
 func (m *Module) ReleaseModule(moduleId uint32) {
-	log.SysLogger.Debugf("release module %s ,id: %d", m.GetModuleName(), moduleId)
 	pModule := m.GetModule(moduleId).GetBaseModule().(*Module)
+	if pModule == nil {
+		log.SysLogger.Errorf("module %d not found", moduleId)
+		return
+	}
+
+	log.SysLogger.Debugf("release module %s ,id: %d name:%s", m.GetModuleName(), moduleId, pModule.GetModuleName())
 
 	//释放子孙
 	for id := range pModule.children {
@@ -172,20 +192,7 @@ func (m *Module) ReleaseModule(moduleId uint32) {
 	delete(m.GetRoot().GetBaseModule().(*Module).rootContains, moduleId)
 
 	//清理被删除的Module
-	pModule.self = nil
-	pModule.parent = nil
-	pModule.children = nil
-	pModule.mapActiveTimer = nil
-	pModule.timerDispatcher = nil
-	pModule.root = nil
-	pModule.rootContains = nil
-	pModule.IRpcHandler = nil
-	pModule.mapActiveIDTimer = nil
-	pModule.eventHandler = nil
-	pModule.IConcurrent = nil
-	pModule.moduleId = 0
-	pModule.moduleName = ""
-	pModule.parent = nil
+	pModule.reset()
 }
 
 func (m *Module) NotifyEvent(e inf.IEvent) {

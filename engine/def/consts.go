@@ -38,3 +38,11 @@ const (
 	SvcStatusClosed                // 关闭
 	SvcStatusRetire                // 退休
 )
+
+const (
+	DefaultHttpRespMsg = "ok"
+)
+
+const (
+	DefaultHttpRespCode = 0 // 正常
+)

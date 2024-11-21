@@ -8,7 +8,7 @@ package msgenvelope
 import (
 	"errors"
 	"github.com/njtc406/chaosengine/engine/actor"
-	"github.com/njtc406/chaosengine/engine/def"
+	"github.com/njtc406/chaosengine/engine/dto"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/njtc406/chaosengine/engine/utils/pool"
@@ -17,20 +17,20 @@ import (
 )
 
 type MsgEnvelope struct {
-	def.DataRef
+	dto.DataRef
 	sender       *actor.PID           // 发送者
 	receiver     *actor.PID           // 接收者
 	senderClient inf.IRpcSender       // 发送者客户端(用于回调)
 	method       string               // 调用方法
 	reqID        uint64               // 请求ID(防止重复,目前还未做防重复逻辑)
 	reply        bool                 // 是否是回复
-	header       def.Header           // 消息头
+	header       dto.Header           // 消息头
 	timeout      time.Duration        // 请求超时时间
 	request      interface{}          // 请求参数
 	response     interface{}          // 回复数据
 	needResp     bool                 // 是否需要回复
 	err          error                // 错误
-	callbacks    []def.CompletionFunc // 完成回调
+	callbacks    []dto.CompletionFunc // 完成回调
 	done         chan struct{}        // 完成信号
 }
 
@@ -56,7 +56,7 @@ func (e *MsgEnvelope) Reset() {
 	e.callbacks = e.callbacks[:0]
 }
 
-func (e *MsgEnvelope) SetHeaders(header def.Header) {
+func (e *MsgEnvelope) SetHeaders(header dto.Header) {
 	for k, v := range header {
 		e.SetHeader(k, v)
 	}
@@ -118,7 +118,7 @@ func (e *MsgEnvelope) SetNeedResponse(need bool) {
 	e.needResp = need
 }
 
-func (e *MsgEnvelope) SetCallback(cbs []def.CompletionFunc) {
+func (e *MsgEnvelope) SetCallback(cbs []dto.CompletionFunc) {
 	e.callbacks = append(e.callbacks, cbs...)
 }
 
@@ -126,7 +126,7 @@ func (e *MsgEnvelope) GetHeader(key string) string {
 	return e.header.Get(key)
 }
 
-func (e *MsgEnvelope) GetHeaders() def.Header {
+func (e *MsgEnvelope) GetHeaders() dto.Header {
 	return e.header
 }
 
@@ -188,6 +188,8 @@ func (e *MsgEnvelope) NeedResponse() bool {
 func (e *MsgEnvelope) Done() {
 	if e.done != nil {
 		e.done <- struct{}{}
+	} else {
+		log.SysLogger.Warn("=================envelope done is nil===================")
 	}
 }
 

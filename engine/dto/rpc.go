@@ -1,9 +1,9 @@
-// Package def
+// Package dto
 // @Title  title
 // @Description  desc
 // @Author  yr  2024/11/8
 // @Update  yr  2024/11/8
-package def
+package dto
 
 // CancelRpc 异步调用时的取消函数,可用于取消回调(请注意,一旦调用发送后是无法取消的,只能取消回调)
 type CancelRpc func()

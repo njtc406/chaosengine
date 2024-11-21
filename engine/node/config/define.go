@@ -19,6 +19,7 @@ type conf struct {
 	SystemLogger     *log.LoggerConf `binding:"required"`            // 系统日志
 	NodeConf         *node           `binding:"omitempty"`           // 节点配置(允许为空, 可以从环境变量中获取)
 	ProfilerInterval time.Duration   `binding:""`                    // 性能分析间隔
+	AntsPoolSize     int             `binding:""`                    // 线程池大小
 }
 
 func (s *conf) GetSystemLoggerFileName() string {

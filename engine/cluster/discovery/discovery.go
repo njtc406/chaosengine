@@ -7,6 +7,7 @@ package discovery
 
 import (
 	"context"
+	"github.com/njtc406/chaosengine/engine/dto"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"sync"
 	"sync/atomic"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/njtc406/chaosengine/engine/actor"
 	"github.com/njtc406/chaosengine/engine/cluster/config"
-	"github.com/njtc406/chaosengine/engine/def"
 	"github.com/njtc406/chaosengine/engine/event"
 	"github.com/njtc406/chaosengine/engine/utils/asynclib"
 	"github.com/njtc406/chaosengine/engine/utils/log"
@@ -28,7 +28,7 @@ import (
 const minWatchTTL = time.Second * 3
 
 type watcherInfo struct {
-	def.DataRef
+	dto.DataRef
 	pid     *actor.PID
 	leaseID clientv3.LeaseID
 	closed  bool

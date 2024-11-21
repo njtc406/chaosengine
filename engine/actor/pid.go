@@ -16,14 +16,14 @@ func CreateServiceUid(serverId int32, serviceName, serviceId string) string {
 }
 
 func NewPID(nodeId int32, nodeType, address string, serverId int32, serviceID, serviceName string, version int64) *PID {
-	uid := CreateServiceUid(serverId, serviceName, serviceID)
+	serviceUid := CreateServiceUid(serverId, serviceName, serviceID)
 	return &PID{
 		Address:    address,
 		NodeId:     nodeId,
 		NodeType:   nodeType,
-		Uid:        uid,
+		Uid:        serviceID,
 		Name:       serviceName,
-		ServiceUid: serviceID,
+		ServiceUid: serviceUid,
 		ServerId:   serverId,
 		Version:    version,
 	}

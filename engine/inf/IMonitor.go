@@ -6,7 +6,7 @@
 package inf
 
 type IMonitor interface {
-	Init(fun func(f IEnvelope))
+	Init() IMonitor
 	Start()
 	Stop()
 	Add(call IEnvelope)

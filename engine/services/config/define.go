@@ -5,5 +5,5 @@ import (
 )
 
 type config struct {
-	Services map[string]*def.ServiceInitConf
+	Services []*def.ServiceInitConf
 }

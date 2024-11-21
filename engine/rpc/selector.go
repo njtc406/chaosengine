@@ -12,9 +12,9 @@ func (h *Handler) Select(serverId int32, serviceId, serviceName string) inf.IBus
 }
 
 // SelectSameServer 选择相同服务器标识的服务
-func (h *Handler) SelectSameServer(serviceUid, serviceName string) inf.IBus {
+func (h *Handler) SelectSameServer(serviceId, serviceName string) inf.IBus {
 	pid := h.GetPID()
-	return endpoints.GetEndpointManager().Select(pid, pid.GetServerId(), serviceUid, serviceName)
+	return endpoints.GetEndpointManager().Select(pid, pid.GetServerId(), serviceId, serviceName)
 }
 
 func (h *Handler) SelectByPid(receiver *actor.PID) inf.IBus {

@@ -42,4 +42,5 @@ module: 即最小的业务单元, module无法独立运行, 必须依附于servi
 ### TIPS
 ````
 1. 敏感配置在打包时请使用 //go:embed config.yaml 嵌入到二进制中
+2. 在重要的程序返回error时,请使用errlib.CError,以便返回更详细的错误信息,能快速的定位到报错的位置
 ````

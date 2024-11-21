@@ -8,9 +8,9 @@ package inf
 import (
 	"context"
 	"github.com/njtc406/chaosengine/engine/actor"
-	"github.com/njtc406/chaosengine/engine/def"
+	"github.com/njtc406/chaosengine/engine/dto"
 )
 
 type IRpcListener interface {
-	RPCCall(ctx context.Context, req *actor.Message, res *def.RPCResponse) error
+	RPCCall(ctx context.Context, req *actor.Message, res *dto.RPCResponse) error
 }

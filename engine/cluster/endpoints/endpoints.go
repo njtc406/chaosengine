@@ -98,8 +98,8 @@ func (em *EndpointManager) removeServiceInfo(e inf.IEvent) {
 }
 
 // AddService 添加本地服务到服务发现中
-func (em *EndpointManager) AddService(serverId int32, serviceID, serviceName string, version int64, rpcHandler inf.IRpcHandler) *actor.PID {
-	pid := actor.NewPID(em.remote.GetNodeId(), em.remote.GetNodeType(), em.remote.GetAddress(), serverId, serviceID, serviceName, version)
+func (em *EndpointManager) AddService(serverId int32, serviceId, serviceName string, version int64, rpcHandler inf.IRpcHandler) *actor.PID {
+	pid := actor.NewPID(em.remote.GetNodeId(), em.remote.GetNodeType(), em.remote.GetAddress(), serverId, serviceId, serviceName, version)
 	log.SysLogger.Debugf("add local service: %s, pid: %v", pid.String(), rpcHandler)
 	em.repository.Add(client.NewLClient(pid, rpcHandler))
 

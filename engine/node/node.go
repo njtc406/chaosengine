@@ -61,14 +61,14 @@ func Start(v string, confPath string) {
 	log.Init(config.Conf.GetSystemLoggerFileName(), config.Conf.SystemLogger, config.IsDebug())
 
 	// 启动线程池
-	asynclib.InitAntsPool(10000)
+	asynclib.InitAntsPool(config.Conf.AntsPoolSize)
 
-	// 初始化等待队列
-	monitor.GetRpcMonitor().Init()
+	// 初始化等待队列,并启动监听
+	monitor.GetRpcMonitor().Init().Start()
 
 	// 初始化集群设置
 	cluster.GetCluster().Init(config.Conf.NodeConf.ID, config.Conf.NodeConf.Type, confPath)
-	log.SysLogger.Debugf("cluster.GetCluster().Init config.Conf.NodeConf.GetNodeUid() %s", config.Conf.NodeConf.GetNodeUid())
+	// 启动集群管理器
 	cluster.GetCluster().Start()
 
 	// 记录pid
@@ -111,12 +111,13 @@ func Start(v string, confPath string) {
 	log.SysLogger.Info("==================>>begin stop modules<<==================")
 	services.StopAll()
 	cluster.GetCluster().Close()
+	monitor.GetRpcMonitor().Stop()
 	log.SysLogger.Info("server stopped, program exited...")
 	log.Close()
 }
 
 func initNode(serviceConfig map[string]*def.ServiceInitConf) {
-	// TODO: 这里还是有点问题,基础服务中如果有db服务,那么db服务需要最先初始化,并且最后被关闭,否则可能在服务器关闭的时候会出问题
+	log.SysLogger.Debugf("serviceConfig: %+v", serviceConfig)
 	// 先加载基础服务
 	for _, s := range baseSetupService {
 		s.Init(s, serviceConfig[s.GetName()], config.GetConf(s.GetName()))

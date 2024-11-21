@@ -8,6 +8,7 @@ package messagebus
 import (
 	"fmt"
 	"github.com/njtc406/chaosengine/engine/def"
+	"github.com/njtc406/chaosengine/engine/dto"
 	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/monitor"
@@ -20,7 +21,7 @@ import (
 )
 
 type MessageBus struct {
-	def.DataRef
+	dto.DataRef
 	senderClient   inf.IRpcSender
 	receiverClient inf.IRpcSender
 }
@@ -50,24 +51,26 @@ func (mb *MessageBus) call(method string, timeout time.Duration, in, out interfa
 		return fmt.Errorf("senderClient or receiver is nil")
 	}
 
-	switch out.(type) {
-	case []interface{}:
-		// 远程调用都是固定的proto消息,不会出现这个类型的参数
-		// 本地调用,接收多参数返回值,那么所有的接收参数都必须是指针或者引用类型
-		for i, v := range out.([]interface{}) {
-			kd := reflect.TypeOf(v).Kind()
-			if kd == reflect.Ptr || kd == reflect.Interface ||
-				kd == reflect.Func || kd == reflect.Map ||
-				kd == reflect.Slice || kd == reflect.Chan {
-				return fmt.Errorf("multi out call: all out params must be pointer, but the %v one got %v", i, kd)
+	if out != nil {
+		switch out.(type) {
+		case []interface{}:
+			// 远程调用都是固定的proto消息,不会出现这个类型的参数
+			// 本地调用,接收多参数返回值,那么所有的接收参数都必须是指针或者引用类型
+			for i, v := range out.([]interface{}) {
+				kd := reflect.TypeOf(v).Kind()
+				if kd != reflect.Ptr && kd != reflect.Interface &&
+					kd != reflect.Func && kd != reflect.Map &&
+					kd != reflect.Slice && kd != reflect.Chan {
+					return fmt.Errorf("multi out call: all out params must be pointer, but the %v one got %v", i, kd)
+				}
 			}
-		}
-	default:
-		kd := reflect.TypeOf(out).Kind()
-		if kd == reflect.Ptr || kd == reflect.Interface ||
-			kd == reflect.Func || kd == reflect.Map ||
-			kd == reflect.Slice || kd == reflect.Chan {
-			return fmt.Errorf("single out call: out param must be pointer")
+		default:
+			kd := reflect.TypeOf(out).Kind()
+			if kd != reflect.Ptr && kd != reflect.Interface &&
+				kd != reflect.Func && kd != reflect.Map &&
+				kd != reflect.Slice && kd != reflect.Chan {
+				return fmt.Errorf("single out call: out param must be pointer, but got:%v", kd)
+			}
 		}
 	}
 
@@ -101,7 +104,6 @@ func (mb *MessageBus) call(method string, timeout time.Duration, in, out interfa
 	envelope.Wait()
 
 	mt.Remove(envelope.GetReqId()) // 容错,不管有没有释放,都释放一次(实际上在所有设置done之前都会释放)
-
 	if err := envelope.GetError(); err != nil {
 		return err
 	}
@@ -111,33 +113,57 @@ func (mb *MessageBus) call(method string, timeout time.Duration, in, out interfa
 	// 获取到返回后直接释放
 	msgenvelope.ReleaseMsgEnvelope(envelope)
 
-	switch out.(type) {
-	case []interface{}:
-		respList, ok := resp.([]interface{})
-		if !ok {
-			return fmt.Errorf("call: type not match, expected %v but got %v", reflect.TypeOf(out), reflect.TypeOf(respList))
-		}
-		for idx, v := range out.([]interface{}) {
-			if reflect.TypeOf(v) != reflect.TypeOf(respList[idx]) {
-				return fmt.Errorf("call: type not match, expected %v but got %v", reflect.TypeOf(v), reflect.TypeOf(resp))
+	// 如果out为nil表示丢弃返回值
+	if out != nil {
+		switch out.(type) {
+		case []interface{}:
+			outList := out.([]interface{})
+			respList, ok := resp.([]interface{})
+			if !ok {
+				return fmt.Errorf("call: type not match, expected %v but got %v", reflect.TypeOf(out), reflect.TypeOf(respList))
+			}
+			for idx, v := range outList {
+				respType := reflect.TypeOf(respList[idx])
+				respKd := respType.Kind()
+				if respKd == reflect.Ptr {
+					respType = respType.Elem()
+				}
+				outType := reflect.TypeOf(v)
+				outKd := outType.Kind()
+				if outKd == reflect.Ptr {
+					outType = outType.Elem()
+				}
+				if outType != respType {
+					return fmt.Errorf("call: type not match, expected %v but got %v", outType, respType)
+				}
+				respVal := reflect.ValueOf(respList[idx])
+				if respVal.Kind() == reflect.Ptr {
+					respVal = respVal.Elem()
+				}
+
+				reflect.ValueOf(v).Elem().Set(respVal)
+			}
+		default:
+			respType := reflect.TypeOf(resp)
+			respKd := respType.Kind()
+			if respKd == reflect.Ptr {
+				respType = respType.Elem()
+			}
+			outType := reflect.TypeOf(out)
+			outKd := outType.Kind()
+			if outKd == reflect.Ptr {
+				outType = outType.Elem()
+			}
+			if outType != respType {
+				return fmt.Errorf("call: type not match, expected %v but got %v", outType, respType)
+			}
+			respVal := reflect.ValueOf(resp)
+			if respVal.Kind() == reflect.Ptr {
+				respVal = respVal.Elem()
 			}
 
-			reflect.ValueOf(v).Elem().Set(reflect.ValueOf(respList[idx]))
+			reflect.ValueOf(out).Elem().Set(respVal)
 		}
-
-		for i := 0; i < len(out.([]interface{})); i++ {
-			if reflect.TypeOf(out) != reflect.TypeOf(resp) {
-				return fmt.Errorf("call: type not match, expected %v but got %v", reflect.TypeOf(out), reflect.TypeOf(resp))
-			}
-
-			reflect.ValueOf(out).Elem().Set(reflect.ValueOf(resp))
-		}
-	default:
-		if reflect.TypeOf(out) != reflect.TypeOf(resp) {
-			return fmt.Errorf("call: type not match, expected %v but got %v", reflect.TypeOf(out), reflect.TypeOf(resp))
-		}
-
-		reflect.ValueOf(out).Elem().Set(reflect.ValueOf(resp))
 	}
 
 	return nil
@@ -152,9 +178,9 @@ func (mb *MessageBus) CallWithTimeout(method string, timeout time.Duration, in, 
 }
 
 // AsyncCall 异步调用服务
-func (mb *MessageBus) AsyncCall(method string, timeout time.Duration, callbacks []def.CompletionFunc, in interface{}) (def.CancelRpc, error) {
+func (mb *MessageBus) AsyncCall(method string, timeout time.Duration, callbacks []dto.CompletionFunc, in interface{}) (dto.CancelRpc, error) {
 	if mb.senderClient == nil || mb.receiverClient == nil {
-		return def.EmptyCancelRpc, fmt.Errorf("senderClient or receiver is nil")
+		return dto.EmptyCancelRpc, fmt.Errorf("senderClient or receiver is nil")
 	}
 
 	mt := monitor.GetRpcMonitor()
@@ -181,7 +207,7 @@ func (mb *MessageBus) AsyncCall(method string, timeout time.Duration, callbacks 
 		mt.Remove(envelope.GetReqId())
 		msgenvelope.ReleaseMsgEnvelope(envelope)
 		log.SysLogger.Errorf("service[%s] send message[%s] request to client failed, error: %v", mb.senderClient.GetName(), envelope.GetMethod(), err)
-		return def.EmptyCancelRpc, errdef.RPCCallFailed
+		return dto.EmptyCancelRpc, errdef.RPCCallFailed
 	}
 
 	return mt.NewCancel(envelope.GetReqId()), nil
@@ -272,17 +298,17 @@ func (m MultiBus) CallWithTimeout(serviceMethod string, timeout time.Duration, i
 	return m[0].CallWithTimeout(serviceMethod, timeout, in, out)
 }
 
-func (m MultiBus) AsyncCall(serviceMethod string, timeout time.Duration, callbacks []def.CompletionFunc, in interface{}) (def.CancelRpc, error) {
+func (m MultiBus) AsyncCall(serviceMethod string, timeout time.Duration, callbacks []dto.CompletionFunc, in interface{}) (dto.CancelRpc, error) {
 	if len(m) == 0 {
 		log.SysLogger.Errorf("===========select empty service to async call %s", serviceMethod)
-		return def.EmptyCancelRpc, nil
+		return dto.EmptyCancelRpc, nil
 	}
 	if len(m) > 1 {
 		// 释放所有节点
 		for _, bus := range m {
 			ReleaseMessageBus(bus.(*MessageBus))
 		}
-		return def.EmptyCancelRpc, fmt.Errorf("only one node can be called at a time, now got %v", len(m))
+		return dto.EmptyCancelRpc, fmt.Errorf("only one node can be called at a time, now got %v", len(m))
 	}
 	// call只允许调用一个节点
 	return m[0].AsyncCall(serviceMethod, timeout, callbacks, in)

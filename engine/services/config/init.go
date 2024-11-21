@@ -22,7 +22,12 @@ func parseClusterConfig(nodeConfigPath string) map[string]*def.ServiceInitConf {
 	conf := new(config)
 	parseSystemConfig(parser, conf)
 
-	return conf.Services
+	var ret = make(map[string]*def.ServiceInitConf)
+	for _, v := range conf.Services {
+		ret[v.Name] = v
+	}
+
+	return ret
 }
 
 func parseSystemConfig(parser *viper.Viper, c interface{}) {

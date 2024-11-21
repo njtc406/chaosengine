@@ -11,6 +11,7 @@ import (
 
 type IRpcHandler interface {
 	IRpcChannel
+	IHttpChannel
 	IRpcSelector
 
 	GetName() string
@@ -25,7 +26,7 @@ type IRpcHandler interface {
 type IRpcSelector interface {
 	Select(serverId int32, serviceId, serviceName string) IBus
 
-	SelectSameServer(serviceUid, serviceName string) IBus
+	SelectSameServer(serviceId, serviceName string) IBus
 
 	SelectByPid(receiver *actor.PID) IBus
 
@@ -35,4 +36,8 @@ type IRpcSelector interface {
 
 type IRpcChannel interface {
 	PushRequest(req IEnvelope) error
+}
+
+type IHttpChannel interface {
+	PushHttpEvent(e interface{}) error
 }

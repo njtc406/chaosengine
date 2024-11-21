@@ -35,6 +35,7 @@ func (r *Repository) SelectByPid(sender, receiver *actor.PID) inf.IBus {
 func (r *Repository) SelectBySvcUid(sender *actor.PID, serviceUid string) inf.IBus {
 	s := r.SelectByServiceUid(sender.GetServiceUid())
 	c := r.SelectByServiceUid(serviceUid)
+
 	if c != nil && !actor.IsRetired(c.GetPID()) {
 		b := messagebus.NewMessageBus(s, c)
 		return b

@@ -38,6 +38,8 @@ func (h *Handler) Init(rpcHandler inf.IRpcHandler) {
 	h.methodMap = make(map[string]*MethodInfo)
 
 	h.registerMethod()
+
+	log.SysLogger.Debugf("methodMap:%+v", h.methodMap)
 }
 
 func (h *Handler) registerMethod() {
@@ -78,6 +80,8 @@ func (h *Handler) suitableMethods(method reflect.Method) error {
 			h.isPublic = true
 		}
 	}
+
+	log.SysLogger.Debugf("method:%s", method.Name)
 
 	var methodInfo MethodInfo
 
@@ -134,6 +138,8 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 			log.SysLogger.Errorf("service[%s] handle message panic: %v\n trace:%s", h.GetName(), r, debug.Stack())
 		}
 	}()
+
+	log.SysLogger.Debugf("rpc request handler -> begin handle message: %+v", envelope)
 
 	var (
 		params  []reflect.Value
@@ -226,6 +232,7 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 
 DoResponse:
 	if envelope.NeedResponse() {
+		log.SysLogger.Debugf("============>>>>>>>>>>>>1111111111111111111111111")
 		// 需要回复
 		envelope.SetReply()      // 这是回复
 		envelope.SetRequest(nil) // 清除请求数据
@@ -236,6 +243,7 @@ DoResponse:
 			msgenvelope.ReleaseMsgEnvelope(envelope)
 		}
 	} else {
+		log.SysLogger.Debugf("============>>>>>>>>>>>>22222222222222222222222222")
 		// 不需要回复,释放资源
 		msgenvelope.ReleaseMsgEnvelope(envelope)
 	}
