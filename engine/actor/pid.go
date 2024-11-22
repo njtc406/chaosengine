@@ -15,17 +15,17 @@ func CreateServiceUid(serverId int32, serviceName, serviceId string) string {
 	return fmt.Sprintf("%d:%s@%s", serverId, serviceName, serviceId)
 }
 
-func NewPID(nodeId int32, nodeType, address string, serverId int32, serviceID, serviceName string, version int64) *PID {
+func NewPID(nodeId int32, address string, serverId int32, serviceID, serviceType, serviceName string, version int64) *PID {
 	serviceUid := CreateServiceUid(serverId, serviceName, serviceID)
 	return &PID{
-		Address:    address,
-		NodeId:     nodeId,
-		NodeType:   nodeType,
-		Uid:        serviceID,
-		Name:       serviceName,
-		ServiceUid: serviceUid,
-		ServerId:   serverId,
-		Version:    version,
+		Address:     address,
+		NodeId:      nodeId,
+		ServiceType: serviceType,
+		Uid:         serviceID,
+		Name:        serviceName,
+		ServiceUid:  serviceUid,
+		ServerId:    serverId,
+		Version:     version,
 	}
 }
 

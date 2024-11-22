@@ -11,6 +11,7 @@ import (
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/monitor"
 	"github.com/njtc406/chaosengine/engine/node/config"
+	"github.com/njtc406/chaosengine/engine/profiler"
 	"github.com/njtc406/chaosengine/engine/services"
 	serviceConf "github.com/njtc406/chaosengine/engine/services/config"
 	"github.com/njtc406/chaosengine/engine/utils/asynclib"
@@ -105,7 +106,7 @@ func Start(v string, confPath string) {
 			log.SysLogger.Infof("-------------->>received the signal: %v", sig)
 			running = false
 		case <-pProfilerTicker.C:
-			//profiler.Report()
+			profiler.Report()
 		}
 	}
 	log.SysLogger.Info("==================>>begin stop modules<<==================")

@@ -28,11 +28,13 @@ import (
 type Service struct {
 	Module
 
-	pid      *actor.PID // 服务基础信息
-	name     string     // 服务名称
-	id       string     // 服务唯一id(针对本地节点的相同服务名称中唯一)
-	serverId int32      // 服务id
-	version  int64      // 服务版本
+	pid *actor.PID // 服务基础信息
+
+	id          string // 服务唯一id(针对本地节点的相同服务名称中唯一)
+	name        string // 服务名称
+	serviceType string // 服务类型
+	serverId    int32  // 服务id
+	version     int64  // 服务版本
 
 	src          inf.IService       // 服务源
 	cfg          interface{}        // 服务配置
@@ -57,7 +59,12 @@ func (s *Service) Init(svc interface{}, serviceInitConf *def.ServiceInitConf, cf
 			GoroutineNum: def.DefaultGoroutineNum,
 		}
 	}
+
 	// 初始化服务数据
+	s.serviceType = serviceInitConf.Type
+	if s.serviceType == "" {
+		s.serviceType = "Unknown"
+	}
 	s.serverId = serviceInitConf.ServerId
 	s.src = svc.(inf.IService)
 	s.cfg = cfg
@@ -118,7 +125,7 @@ func (s *Service) Start() error {
 	waitRun.Wait()
 
 	// 所有服务都注册到服务列表
-	s.pid = endpoints.GetEndpointManager().AddService(s.serverId, s.id, s.name, s.version, s.GetRpcHandler())
+	s.pid = endpoints.GetEndpointManager().AddService(s.serverId, s.id, s.serviceType, s.name, s.version, s.GetRpcHandler())
 	log.SysLogger.Infof(" service[%s] pid: %s", s.GetName(), s.pid.String())
 	return nil
 }

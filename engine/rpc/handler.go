@@ -1,8 +1,8 @@
 // Package rpc
 // @Title  title
 // @Description  desc
-// @Author  pc  2024/11/5
-// @Update  pc  2024/11/5
+// @Author  yr  2024/11/5
+// @Update  yr  2024/11/5
 package rpc
 
 import (
@@ -23,7 +23,7 @@ type MethodInfo struct {
 	Method   reflect.Method
 	In       []reflect.Type
 	Out      []reflect.Type
-	MultiOut bool
+	MultiOut bool // 是否是多参数返回(排除error以外,还有两个及以上的返回值)
 }
 
 type Handler struct {
@@ -38,8 +38,6 @@ func (h *Handler) Init(rpcHandler inf.IRpcHandler) {
 	h.methodMap = make(map[string]*MethodInfo)
 
 	h.registerMethod()
-
-	log.SysLogger.Debugf("methodMap:%+v", h.methodMap)
 }
 
 func (h *Handler) registerMethod() {
@@ -80,8 +78,6 @@ func (h *Handler) suitableMethods(method reflect.Method) error {
 			h.isPublic = true
 		}
 	}
-
-	log.SysLogger.Debugf("method:%s", method.Name)
 
 	var methodInfo MethodInfo
 

@@ -5,7 +5,9 @@
 // @Update  yr  2024/11/7
 package inf
 
-import "github.com/njtc406/chaosengine/engine/actor"
+import (
+	"github.com/njtc406/chaosengine/engine/actor"
+)
 
 type ISelector interface {
 	// Select 选择服务
@@ -16,8 +18,5 @@ type ISelector interface {
 
 	SelectByPid(sender, receiver *actor.PID) IBus
 
-	SelectByNodeType(sender *actor.PID, nodeType, serviceName string) IBus
-
-	// SelectOneByType 根据选择类型选择服务(暂时不做)
-	//SelectOneByType(sender *actor.PID, selectType int32, rule func(pid *actor.PID)) IBus
+	SelectByServiceType(sender *actor.PID, serviceType, serviceName string) IBus
 }

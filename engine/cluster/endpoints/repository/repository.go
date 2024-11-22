@@ -16,14 +16,14 @@ type Repository struct {
 	mapNodeLock sync.RWMutex
 	// 快速查询表
 	mapSvcBySNameAndSUid map[string]map[string]struct{}            // [serviceName]map[serviceUid]struct{}
-	mapSvcByNtpAndSName  map[string]map[string]map[string]struct{} // [nodeType]map[serviceName]map[serviceUid]struct{}
+	mapSvcBySTpAndSName  map[string]map[string]map[string]struct{} // [serviceType]map[serviceName]map[serviceUid]struct{}
 }
 
 func NewRepository() *Repository {
 	return &Repository{
 		mapPID:               new(sync.Map),
 		mapSvcBySNameAndSUid: make(map[string]map[string]struct{}),
-		mapSvcByNtpAndSName:  make(map[string]map[string]map[string]struct{}),
+		mapSvcBySTpAndSName:  make(map[string]map[string]map[string]struct{}),
 	}
 }
 
@@ -33,7 +33,7 @@ func (r *Repository) Add(client inf.IRpcSender) {
 	defer r.mapNodeLock.Unlock()
 
 	pid := client.GetPID()
-	nodeType := pid.GetNodeType()
+	serviceType := pid.GetServiceType()
 	serviceName := pid.GetName()
 	serviceUid := pid.GetServiceUid()
 
@@ -48,10 +48,10 @@ func (r *Repository) Add(client inf.IRpcSender) {
 		nameMap[serviceUid] = struct{}{}
 	}
 
-	nodeNameUidMap, ok := r.mapSvcByNtpAndSName[nodeType]
+	nodeNameUidMap, ok := r.mapSvcBySTpAndSName[serviceType]
 	if !ok {
-		r.mapSvcByNtpAndSName[nodeType] = make(map[string]map[string]struct{})
-		nodeNameUidMap = r.mapSvcByNtpAndSName[nodeType]
+		r.mapSvcBySTpAndSName[serviceType] = make(map[string]map[string]struct{})
+		nodeNameUidMap = r.mapSvcBySTpAndSName[serviceType]
 	}
 
 	nameUidMap, ok := nodeNameUidMap[serviceName]
@@ -78,7 +78,7 @@ func (r *Repository) Remove(pid *actor.PID) {
 	defer r.mapNodeLock.Unlock()
 	serviceName := pid.GetName()
 	serviceUid := pid.GetServiceUid()
-	nodeType := pid.GetNodeType()
+	serviceType := pid.GetServiceType()
 
 	nameMap, ok := r.mapSvcBySNameAndSUid[serviceName]
 	if ok {
@@ -90,7 +90,7 @@ func (r *Repository) Remove(pid *actor.PID) {
 		return
 	}
 
-	nodeNameUidMap, ok := r.mapSvcByNtpAndSName[nodeType]
+	nodeNameUidMap, ok := r.mapSvcBySTpAndSName[serviceType]
 	if ok {
 		nameUidMap, ok := nodeNameUidMap[serviceName]
 		if ok {
@@ -100,7 +100,7 @@ func (r *Repository) Remove(pid *actor.PID) {
 			}
 		}
 		if len(nodeNameUidMap) == 0 {
-			delete(r.mapSvcByNtpAndSName, nodeType)
+			delete(r.mapSvcBySTpAndSName, serviceType)
 		}
 	}
 }
