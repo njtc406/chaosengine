@@ -4,7 +4,7 @@
 # rpc监听
 RPCServer:
   # 监听地址
-  Addr: 0.0.0.0:8195
+  Addr: 0.0.0.0:6688
   # 协议
   Protoc: "tcp"
   # 最大rpc参数长度(默认 2097152=2M)
@@ -22,8 +22,10 @@ ETCDConf:
   EtcdEndPoints:
     - 127.0.0.1:2379
   # 服务发现的监听路径
-  DiscoveryPath: /3match/api
+  DiscoveryPath: /server/service
   TTLSecond: 30s
   DialTimeout: 3s
+  # etcd用户名
   UserName: root
+  # etcd密码
   Password: 123456

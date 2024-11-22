@@ -159,7 +159,6 @@ func (s *Service) run() {
 			// 事件处理
 			switch ev.GetType() {
 			case event.SysEventRpc:
-				log.SysLogger.Debugf("ccccccccccccccccccccccccccccc")
 				// rpc调用
 				cEvent, ok := ev.(*event.Event)
 				if !ok {

@@ -24,6 +24,7 @@ type MessageBus struct {
 	dto.DataRef
 	senderClient   inf.IRpcSender
 	receiverClient inf.IRpcSender
+	err            error
 }
 
 func (mb *MessageBus) Reset() {
@@ -35,10 +36,11 @@ var busPool = pool.NewPoolEx(make(chan pool.IPoolData, 2048), func() pool.IPoolD
 	return &MessageBus{}
 })
 
-func NewMessageBus(sender inf.IRpcSender, receiver inf.IRpcSender) *MessageBus {
+func NewMessageBus(sender inf.IRpcSender, receiver inf.IRpcSender, err error) *MessageBus {
 	mb := busPool.Get().(*MessageBus)
 	mb.senderClient = sender
 	mb.receiverClient = receiver
+	mb.err = err
 	return mb
 }
 
@@ -47,6 +49,7 @@ func ReleaseMessageBus(mb *MessageBus) {
 }
 
 func (mb *MessageBus) call(method string, timeout time.Duration, in, out interface{}) error {
+	defer ReleaseMessageBus(mb)
 	if mb.senderClient == nil || mb.receiverClient == nil {
 		return fmt.Errorf("senderClient or receiver is nil")
 	}
@@ -179,6 +182,7 @@ func (mb *MessageBus) CallWithTimeout(method string, timeout time.Duration, in, 
 
 // AsyncCall 异步调用服务
 func (mb *MessageBus) AsyncCall(method string, timeout time.Duration, callbacks []dto.CompletionFunc, in interface{}) (dto.CancelRpc, error) {
+	defer ReleaseMessageBus(mb)
 	if mb.senderClient == nil || mb.receiverClient == nil {
 		return dto.EmptyCancelRpc, fmt.Errorf("senderClient or receiver is nil")
 	}
@@ -215,6 +219,7 @@ func (mb *MessageBus) AsyncCall(method string, timeout time.Duration, callbacks 
 
 // Send 无返回调用
 func (mb *MessageBus) Send(method string, in interface{}) error {
+	defer ReleaseMessageBus(mb)
 	if mb.receiverClient == nil {
 		return fmt.Errorf("senderClient or receiver is nil")
 	}
@@ -265,7 +270,7 @@ type MultiBus []inf.IBus
 func (m MultiBus) Call(serviceMethod string, in, out interface{}) error {
 	if len(m) == 0 {
 		log.SysLogger.Errorf("===========select empty service to call %s", serviceMethod)
-		return nil
+		return errdef.ServiceIsUnavailable
 	}
 
 	if len(m) > 1 {
@@ -283,7 +288,7 @@ func (m MultiBus) Call(serviceMethod string, in, out interface{}) error {
 func (m MultiBus) CallWithTimeout(serviceMethod string, timeout time.Duration, in, out interface{}) error {
 	if len(m) == 0 {
 		log.SysLogger.Errorf("===========select empty service to call timeout %s", serviceMethod)
-		return nil
+		return errdef.ServiceIsUnavailable
 	}
 
 	if len(m) > 1 {
@@ -301,7 +306,7 @@ func (m MultiBus) CallWithTimeout(serviceMethod string, timeout time.Duration, i
 func (m MultiBus) AsyncCall(serviceMethod string, timeout time.Duration, callbacks []dto.CompletionFunc, in interface{}) (dto.CancelRpc, error) {
 	if len(m) == 0 {
 		log.SysLogger.Errorf("===========select empty service to async call %s", serviceMethod)
-		return dto.EmptyCancelRpc, nil
+		return nil, errdef.ServiceIsUnavailable
 	}
 	if len(m) > 1 {
 		// 释放所有节点
@@ -317,7 +322,7 @@ func (m MultiBus) AsyncCall(serviceMethod string, timeout time.Duration, callbac
 func (m MultiBus) Send(serviceMethod string, in interface{}) error {
 	if len(m) == 0 {
 		log.SysLogger.Errorf("===========select empty service to send %s", serviceMethod)
-		return nil
+		return errdef.ServiceIsUnavailable
 	}
 	var errs []error
 	for _, bus := range m {
@@ -332,7 +337,7 @@ func (m MultiBus) Send(serviceMethod string, in interface{}) error {
 func (m MultiBus) Cast(serviceMethod string, in interface{}) error {
 	if len(m) == 0 {
 		log.SysLogger.Errorf("===========select empty service to cast %s", serviceMethod)
-		return nil
+		return errdef.ServiceIsUnavailable
 	}
 	var errs []error
 	for _, bus := range m {

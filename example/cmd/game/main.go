@@ -9,7 +9,7 @@ import "github.com/njtc406/chaosengine/engine/node"
 
 var version = "1.0"
 
-const configPath = "./configs/game"
+const configPath = "./config/game"
 
 func main() {
 	node.Start(version, configPath)

@@ -14,16 +14,14 @@ import (
 type Remote struct {
 	address  string // 服务监听地址
 	nodeId   int32  // 节点唯一ID
-	nodeType string // 节点类型
 	listener inf.IRpcListener
 	svr      *server.Server
 }
 
-func NewRemote(nodeId int32, nodeType, address string, listener inf.IRpcListener) *Remote {
+func NewRemote(nodeId int32, address string, listener inf.IRpcListener) *Remote {
 	return &Remote{
 		address:  address,
 		nodeId:   nodeId,
-		nodeType: nodeType,
 		listener: listener,
 	}
 }
@@ -53,8 +51,4 @@ func (r *Remote) GetAddress() string {
 
 func (r *Remote) GetNodeId() int32 {
 	return r.nodeId
-}
-
-func (r *Remote) GetNodeType() string {
-	return r.nodeType
 }

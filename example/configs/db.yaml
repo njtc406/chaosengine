@@ -19,6 +19,3 @@ RedisConf:
   MinIdleConns: 10
   MaxConnAge: 1h
   IdleTimeout: 1h
-
-# db服务线程数
-GoroutineNum: 1

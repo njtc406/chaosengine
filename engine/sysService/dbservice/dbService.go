@@ -53,9 +53,6 @@ func (db *DBService) OnInit() error {
 	db.mysqlModule = mysqlmodule.NewMysqlModule()
 	db.mysqlModule.InitConn(conf.MysqlConf, nodeConfig.Conf.NodeConf.ID)
 
-	// 设置线程数
-	db.SetGoRoutineNum(conf.GoroutineNum)
-
 	db.AddModule(db.redisModule)
 	db.AddModule(db.mysqlModule)
 	return nil

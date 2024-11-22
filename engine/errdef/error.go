@@ -27,4 +27,5 @@ var (
 	HttpCreateRequestFailed = errors.New("http create request failed")
 	HttpRequestFailed       = errors.New("http request failed")
 	HttpReadResponseFailed  = errors.New("http read response failed")
+	ServiceIsUnavailable    = errors.New("service is unavailable")
 )

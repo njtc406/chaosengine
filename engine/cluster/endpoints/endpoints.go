@@ -32,8 +32,8 @@ func GetEndpointManager() *EndpointManager {
 	return endMgr
 }
 
-func (em *EndpointManager) Init(nodeId int32, nodeType, addr string, eventProcessor inf.IProcessor) {
-	em.remote = remote.NewRemote(nodeId, nodeType, addr, new(RPCListener))
+func (em *EndpointManager) Init(nodeId int32, addr string, eventProcessor inf.IProcessor) {
+	em.remote = remote.NewRemote(nodeId, addr, new(RPCListener))
 	em.remote.Init()
 
 	em.IProcessor = eventProcessor

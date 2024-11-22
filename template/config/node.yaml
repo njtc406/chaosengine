@@ -3,6 +3,16 @@
 # 系统状态(debug/release)
 SystemStatus: debug
 
+# 节点信息配置
+NodeConf:
+  # 节点id
+  ID: 1
+  # 节点类型
+  Type: login
+
+# 系统线程池大小
+AntsPoolSize: 10000
+
 # 系统缓存目录
 CachePath: ./cache/
 
@@ -29,9 +39,3 @@ SystemLogger:
   # 日志切分周期(默认24h)
   RotationTime: 24h
 
-# 节点信息配置
-NodeConf:
-  # 节点id
-  ID: 1001
-  # 节点类型
-  Type: game

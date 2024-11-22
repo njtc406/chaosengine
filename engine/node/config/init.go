@@ -93,14 +93,6 @@ func fixConf() {
 	if 0 == Conf.NodeConf.ID {
 		log.SysLogger.Panic("无法获取节点id,请在配置文件中配置或者在环境变量中设置NODE_ID")
 	}
-
-	nodeType := os.Getenv("NODE_TYPE")
-	if 0 < len(nodeType) {
-		Conf.NodeConf.Type = nodeType
-	}
-	if 0 == len(Conf.NodeConf.Type) {
-		log.SysLogger.Panic("无法获取节点类型,请在环境变量中设置NODE_TYPE")
-	}
 }
 
 // parseServiceConf 解析服务配置文件

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"path"
 	"time"
@@ -31,10 +30,5 @@ func (s *conf) GetSystemLoggerFileName() string {
 }
 
 type node struct {
-	ID   int32  `json:"id"`   // 节点id
-	Type string `json:"type"` // 节点类型
-}
-
-func (n *node) GetNodeUid() string {
-	return fmt.Sprintf("%s_%d", n.Type, n.ID)
+	ID int32 `json:"id"` // 节点id
 }
