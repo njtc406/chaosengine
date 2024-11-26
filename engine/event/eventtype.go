@@ -5,8 +5,6 @@
 // @Update  yr  2024/7/19 下午3:40
 package event
 
-type EventType int
-
 const (
 
 	// 基础事件 -1000以上 系统事件 -1 到 -999  用户事件 1 - 99
@@ -14,7 +12,7 @@ const (
 
 	SysEventRpc        = -1001 // 远程调用事件
 	SysEventReply      = -1002 // 远程调用回复事件
-	SysEventClientMsg  = -1003 // 客户端消息事件
+	SysEventHttpMsg    = -1003 // 客户端消息事件
 	SysEventETCDPut    = -1004 // etcd 存储事件
 	SysEventETCDDel    = -1005 // etcd 删除事件
 	SysEventServiceReg = -1006 // 服务注册事件

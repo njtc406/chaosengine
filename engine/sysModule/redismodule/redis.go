@@ -9,8 +9,6 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/njtc406/chaosengine/engine/core"
-	"github.com/njtc406/chaosengine/engine/errdef/errcode"
-	"github.com/njtc406/chaosutil/chaoserrors"
 	"github.com/redis/go-redis/v9"
 	"time"
 )
@@ -51,7 +49,7 @@ func (rm *RedisModule) SetString(key string, value interface{}, expire time.Dura
 func (rm *RedisModule) SetStringJson(key string, value interface{}, expire time.Duration) error {
 	tmp, err := json.Marshal(value)
 	if err != nil {
-		return chaoserrors.NewErrCode(errcode.ParamsInvalid, "not in json format", err)
+		return err
 	}
 	if err = rm.client.Set(context.Background(), key, string(tmp), expire).Err(); err != nil {
 		return err

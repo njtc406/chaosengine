@@ -1,8 +1,8 @@
 // Package rpc
 // @Title  title
 // @Description  desc
-// @Author  pc  2024/11/5
-// @Update  pc  2024/11/5
+// @Author  yr  2024/11/5
+// @Update  yr  2024/11/5
 package rpc
 
 import (
@@ -23,7 +23,7 @@ type MethodInfo struct {
 	Method   reflect.Method
 	In       []reflect.Type
 	Out      []reflect.Type
-	MultiOut bool
+	MultiOut bool // 是否是多参数返回(排除error以外,还有两个及以上的返回值)
 }
 
 type Handler struct {
@@ -135,6 +135,8 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 		}
 	}()
 
+	log.SysLogger.Debugf("rpc request handler -> begin handle message: %+v", envelope)
+
 	var (
 		params  []reflect.Value
 		results []reflect.Value
@@ -226,6 +228,7 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 
 DoResponse:
 	if envelope.NeedResponse() {
+		log.SysLogger.Debugf("============>>>>>>>>>>>>1111111111111111111111111")
 		// 需要回复
 		envelope.SetReply()      // 这是回复
 		envelope.SetRequest(nil) // 清除请求数据
@@ -236,6 +239,7 @@ DoResponse:
 			msgenvelope.ReleaseMsgEnvelope(envelope)
 		}
 	} else {
+		log.SysLogger.Debugf("============>>>>>>>>>>>>22222222222222222222222222")
 		// 不需要回复,释放资源
 		msgenvelope.ReleaseMsgEnvelope(envelope)
 	}

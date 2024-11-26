@@ -1,45 +1,141 @@
 # 分布式服务框架
-所有的服务都是actor模型,由消息作为服务之间的调用
-服务默认是单线程执行,支持多线程执行
 
-## 感谢 github.com/duanhf2012/origin 作者大哥,我的这个框架有很多东西都是抄他的,感谢他的开源
+这是一个基于 Actor 模型的分布式服务框架，服务之间通过消息进行数据传递。框架特点：
 
-````
-主要的框架结构和origin是一致的,整个框架分为三部分:
-1. node 节点
-2. service 服务
-3. module 模块
+- 服务默认单线程运行，支持多线程扩展。
+- 结构灵活、模块化，便于开发和维护。
 
-node: 即独立运行的进程, 每个节点上可以运行多个service服务
-service: 即一个actor, 以协程的形式运行, 支持多线程执行, 每个service中可以包含多个module
-module: 即最小的业务单元, module无法独立运行, 必须依附于service, 是组成service功能的基础单位
-````
+> 感谢 [github.com/duanhf2012/origin](https://github.com/duanhf2012/origin) 大佬提供的开源项目。本框架参考了其设计理念,做了一些适合自己项目的优化。
 
-````
-集群:
-1. 每个节点都会启动自己的集群模块, 用来管理整个集群中的其他可调用服务
-2. 服务发现模块, 所有service,只要包含RPC开头的接口, 这个service就会被注册到集群中,供其他服务调用
-3. 服务启动后会自动注册
-4. 服务发现是通过etcd实现的, 目前暂时未抽离成接口, 后续有空再弄, 这样就可以接入自己的服务发现
-5. 远程调用目前使用的是rpcx, 可以自行加入自己的rpc框架
-````
+---
 
-````
-1. 目前实现了本节点内的服务调用和跨界点服务调用
-2. 使用etcd作为服务发现中心
-3. rpcx作为rpc框架
-````
+## 框架结构
 
-#### FUTURE
-````
-1. 热更新(这个估摸很难在这个框架中支持)
-2. 自动扩容(这已经是具体的业务需求了)
-3. 自动负载均衡(需要提供策略)
-4. 后台服务管理
-5. 自动服务监控调度(不出意外应该是给出调度规则,然后自动调度,应该可以使用temporal,给一个调度配置,然后自动调度)
-````
+本框架由以下三部分组成：
 
-### TIPS
-````
-1. 敏感配置在打包时请使用 //go:embed config.yaml 嵌入到二进制中
-````
+1. **Node（节点）**  
+   每个节点对应一个独立进程，可以运行多个服务。
+
+2. **Service（服务）**  
+   每个服务是一个 Actor，以协程形式运行，支持多线程执行。服务由若干模块组成。
+
+3. **Module（模块）**  
+   模块是最小的业务单元，依附于服务运行，负责实现具体功能。
+
+---
+
+## 集群功能
+
+1. **集群管理**  
+   每个节点内置集群模块，用于发现和管理注册到集群中的服务。
+
+2. **服务注册与发现**
+    - 所有实现 `RPC` 开头接口的服务，都会自动注册到集群中。
+    - 服务注册与发现通过 `etcd` 实现（还未做成接口,后续再说）。
+
+3. **远程调用**
+    - 基于 `rpcx` 实现跨节点远程调用。
+
+### 当前实现
+
+- 节点内和跨节点服务的调用功能。
+- 基于 `etcd` 的服务发现机制。
+- 配置可以远程,可以本地
+---
+
+## 使用说明
+熟悉origin的童鞋应该可以直接上手,这部分几乎没什么变化,origin的大佬已经做的很简化了
+### 1. 启动一个节点
+
+```go
+package main
+import "github.com/njtc406/chaosengine/engine/node"
+
+var version = "1.0"         // 版本号
+var configPath = "./configs/login" // 配置路径
+
+func main() {
+    // 可设置启动前钩子，例如日志初始化
+    // node.SetStartHook(func() { ... })
+
+    // 启动节点
+    node.Start(version, configPath)
+}
+```
+
+### 2. 增加一个服务
+
+```go
+package main
+import (
+    "github.com/njtc406/chaosengine/engine/core"
+    "github.com/njtc406/chaosengine/engine/node"
+)
+
+func init() {
+    // 注册服务
+    node.Setup(&MyService{})
+
+    // 注册配置
+    nodeConfig.RegisterConf(&nodeConfig.ConfInfo{
+        ServiceName: "MyService",
+        ConfName:    "myServiceConf",
+        ConfPath:    "",
+        ConfType:    "yaml",
+        Cfg:         &config{},
+    })
+}
+
+type config struct {
+    a int
+    b string
+}
+
+type MyService struct {
+    core.Service
+    data int
+}
+
+func (s *MyService) OnInit() error {
+    return nil
+}
+
+func (s *MyService) OnStart() error {
+    return nil
+}
+
+func (s *MyService) OnRelease() {}
+```
+
+3. 增加一个模块
+```go
+package main
+import (
+    "github.com/njtc406/chaosengine/engine/core"
+)
+
+type MyModule struct {
+    core.Module
+}
+
+func (m *MyModule) OnInit() error {
+    return nil
+}
+
+func (m *MyModule) OnRelease() {}
+
+func (s *MyService) OnInit() error {
+    module := &MyModule{}
+    // 添加模块到服务
+    moduleID, err := s.AddModule(module)
+    if err != nil {
+        return err
+    }
+    fmt.Printf("Module ID: %d\n", moduleID)
+    return nil
+}
+
+func (s *MyService) OnRelease() {
+    s.ReleaseAllChildModule()
+}
+```

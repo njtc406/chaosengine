@@ -7,6 +7,7 @@ package repository
 
 import (
 	"github.com/njtc406/chaosengine/engine/actor"
+	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/messagebus"
 )
@@ -26,20 +27,21 @@ func (r *Repository) SelectByPid(sender, receiver *actor.PID) inf.IBus {
 	s := r.SelectByServiceUid(sender.GetServiceUid())
 	c := r.SelectByServiceUid(receiver.GetServiceUid())
 	if c != nil && !actor.IsRetired(c.GetPID()) {
-		b := messagebus.NewMessageBus(s, c)
+		b := messagebus.NewMessageBus(s, c, nil)
 		return b
 	}
-	return nil
+	return messagebus.NewMessageBus(s, c, errdef.ServiceNotFound)
 }
 
 func (r *Repository) SelectBySvcUid(sender *actor.PID, serviceUid string) inf.IBus {
 	s := r.SelectByServiceUid(sender.GetServiceUid())
 	c := r.SelectByServiceUid(serviceUid)
+
 	if c != nil && !actor.IsRetired(c.GetPID()) {
-		b := messagebus.NewMessageBus(s, c)
+		b := messagebus.NewMessageBus(s, c, nil)
 		return b
 	}
-	return nil
+	return messagebus.NewMessageBus(s, c, errdef.ServiceNotFound)
 }
 
 func (r *Repository) SelectByRule(sender *actor.PID, rule func(pid *actor.PID) bool) inf.IBus {
@@ -47,7 +49,7 @@ func (r *Repository) SelectByRule(sender *actor.PID, rule func(pid *actor.PID) b
 	var returnList messagebus.MultiBus
 	r.mapPID.Range(func(key, value any) bool {
 		if rule(value.(inf.IRpcSender).GetPID()) {
-			returnList = append(returnList, messagebus.NewMessageBus(s, value.(inf.IRpcSender)))
+			returnList = append(returnList, messagebus.NewMessageBus(s, value.(inf.IRpcSender), nil))
 		}
 		return true
 	})
@@ -62,19 +64,19 @@ func (r *Repository) Select(sender *actor.PID, serverId int32, serviceId, servic
 	return r.SelectBySvcUid(sender, serviceUid)
 }
 
-func (r *Repository) SelectByNodeType(sender *actor.PID, nodeType, serviceName string) inf.IBus {
+func (r *Repository) SelectByServiceType(sender *actor.PID, nodeType, serviceName string) inf.IBus {
 	r.mapNodeLock.RLock()
 	defer r.mapNodeLock.RUnlock()
 
-	var returnList messagebus.MultiBus
-	nameUidMap, ok := r.mapSvcByNtpAndSName[nodeType]
+	var list messagebus.MultiBus
+	nameUidMap, ok := r.mapSvcBySTpAndSName[nodeType]
 	if !ok {
-		return returnList
+		return list
 	}
 
 	serviceList, ok := nameUidMap[serviceName]
 	if !ok {
-		return returnList
+		return list
 	}
 
 	s := r.SelectByServiceUid(sender.GetServiceUid())
@@ -82,9 +84,9 @@ func (r *Repository) SelectByNodeType(sender *actor.PID, nodeType, serviceName s
 	for serviceUid := range serviceList {
 		c := r.SelectByServiceUid(serviceUid)
 		if c != nil && !actor.IsRetired(c.GetPID()) {
-			returnList = append(returnList, messagebus.NewMessageBus(s, c))
+			list = append(list, messagebus.NewMessageBus(s, c, nil))
 		}
 	}
 
-	return returnList
+	return list
 }

@@ -6,7 +6,7 @@
 package monitor
 
 import (
-	"github.com/njtc406/chaosengine/engine/def"
+	"github.com/njtc406/chaosengine/engine/dto"
 )
 
 type RpcCancel struct {
@@ -17,7 +17,7 @@ func (rc *RpcCancel) CancelRpc() {
 	GetRpcMonitor().Remove(rc.CallSeq)
 }
 
-func NewRpcCancel(seq uint64) def.CancelRpc {
+func NewRpcCancel(seq uint64) dto.CancelRpc {
 	cancel := &RpcCancel{CallSeq: seq}
 	return cancel.CancelRpc
 }

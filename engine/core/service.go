@@ -28,11 +28,13 @@ import (
 type Service struct {
 	Module
 
-	pid      *actor.PID // 服务基础信息
-	name     string     // 服务名称
-	uid      string     // 服务唯一标识
-	serverId int32      // 服务id
-	version  int64      // 服务版本
+	pid *actor.PID // 服务基础信息
+
+	id          string // 服务唯一id(针对本地节点的相同服务名称中唯一)
+	name        string // 服务名称
+	serviceType string // 服务类型
+	serverId    int32  // 服务id
+	version     int64  // 服务版本
 
 	src          inf.IService       // 服务源
 	cfg          interface{}        // 服务配置
@@ -43,8 +45,8 @@ type Service struct {
 	mailBox      chan inf.IEvent    // 事件队列
 	profiler     *profiler.Profiler // 性能分析
 
-	rpcHandler     rpc.Handler      // rpc处理器
-	eventProcessor event.IProcessor // 事件管理器
+	rpcHandler     rpc.Handler    // rpc处理器
+	eventProcessor inf.IProcessor // 事件管理器
 }
 
 func (s *Service) Init(svc interface{}, serviceInitConf *def.ServiceInitConf, cfg interface{}) {
@@ -57,7 +59,12 @@ func (s *Service) Init(svc interface{}, serviceInitConf *def.ServiceInitConf, cf
 			GoroutineNum: def.DefaultGoroutineNum,
 		}
 	}
+
 	// 初始化服务数据
+	s.serviceType = serviceInitConf.Type
+	if s.serviceType == "" {
+		s.serviceType = "Unknown"
+	}
 	s.serverId = serviceInitConf.ServerId
 	s.src = svc.(inf.IService)
 	s.cfg = cfg
@@ -84,13 +91,13 @@ func (s *Service) Init(svc interface{}, serviceInitConf *def.ServiceInitConf, cf
 	}
 
 	// rpc处理器
-	s.rpcHandler.Init(s)
+	s.rpcHandler.Init(svc.(inf.IRpcHandler))
 
 	// 初始化根模块
 	s.self = svc.(inf.IModule)
 	s.root = s.self
 	s.rootContains = make(map[uint32]inf.IModule)
-	s.moduleIdSeed = 1
+	s.moduleIdSeed = def.DefaultModuleIdSeed
 	s.eventProcessor = event.NewProcessor()
 	s.eventProcessor.Init(s)
 	s.eventHandler = event.NewHandler()
@@ -118,7 +125,7 @@ func (s *Service) Start() error {
 	waitRun.Wait()
 
 	// 所有服务都注册到服务列表
-	s.pid = endpoints.GetEndpointManager().AddService(s.serverId, s.uid, s.name, s.version, s.GetRpcHandler())
+	s.pid = endpoints.GetEndpointManager().AddService(s.serverId, s.id, s.serviceType, s.name, s.version, s.GetRpcHandler())
 	log.SysLogger.Infof(" service[%s] pid: %s", s.GetName(), s.pid.String())
 	return nil
 }
@@ -159,35 +166,23 @@ func (s *Service) run() {
 					break
 				}
 				c := cEvent.Data.(inf.IEnvelope)
+				log.SysLogger.Debugf("dddddddddddddddddddddddddd")
 				if c.IsReply() {
 					if s.profiler != nil {
 						analyzer = s.profiler.Push(fmt.Sprintf("[RPCResponse]%s", c.GetMethod()))
 					}
+					log.SysLogger.Debugf("eeeeeeeeeeeeeeeeeeeeeeeeeeeee")
 					// 回复
 					s.rpcHandler.HandleResponse(c)
 				} else {
 					if s.profiler != nil {
 						analyzer = s.profiler.Push(fmt.Sprintf("[RPCRequest]%s", c.GetMethod()))
 					}
+					log.SysLogger.Debugf("fffffffffffffffffffffffffff")
 					// rpc调用
 					s.rpcHandler.HandleRequest(c)
 				}
 
-				event.ReleaseEvent(cEvent)
-				if analyzer != nil {
-					analyzer.Pop()
-					analyzer = nil
-				}
-			case event.SysEventClientMsg:
-				cEvent, ok := ev.(*event.Event)
-				if !ok {
-					log.SysLogger.Error("event type error")
-					break
-				}
-				if s.profiler != nil {
-					analyzer = s.profiler.Push(fmt.Sprintf("[ClientMsg][%d]", cEvent.GetType()))
-				}
-				//s.rpcHandler.HandlerClientMsg(cEvent.Data)
 				event.ReleaseEvent(cEvent)
 				if analyzer != nil {
 					analyzer.Pop()
@@ -251,11 +246,13 @@ func (s *Service) release() {
 }
 
 func (s *Service) pushEvent(e inf.IEvent) error {
-	if len(s.mailBox) >= cap(s.mailBox) {
+	select {
+	case s.mailBox <- e:
+	default:
 		log.SysLogger.Errorf("service[%s] event channel full", s.GetName())
 		return errdef.EventChannelIsFull
 	}
-	s.mailBox <- e
+
 	return nil
 }
 
@@ -264,9 +261,17 @@ func (s *Service) PushEvent(e inf.IEvent) error {
 }
 
 func (s *Service) PushRequest(c inf.IEnvelope) error {
+	log.SysLogger.Debugf("bbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 	ev := event.NewEvent()
 	ev.Type = event.SysEventRpc
 	ev.Data = c
+	return s.pushEvent(ev)
+}
+
+func (s *Service) PushHttpEvent(e interface{}) error {
+	ev := event.NewEvent()
+	ev.Type = event.SysEventHttpMsg
+	ev.Data = e
 	return s.pushEvent(ev)
 }
 
@@ -278,12 +283,16 @@ func (s *Service) GetName() string {
 	return s.name
 }
 
-func (s *Service) SetUid(uid string) {
-	s.uid = uid
+func (s *Service) SetServiceId(id string) {
+	s.id = id
 }
 
-func (s *Service) GetUid() string {
-	return s.uid
+func (s *Service) GetServiceId() string {
+	return s.id
+}
+
+func (s *Service) GetServerId() int32 {
+	return s.serverId
 }
 
 func (s *Service) GetPID() *actor.PID {
@@ -332,8 +341,8 @@ func (s *Service) IsClosed() bool {
 
 func (s *Service) getUniqueKey() string {
 	var name = s.GetName()
-	if s.uid != "" {
-		name = fmt.Sprintf("%s-%s", name, s.uid)
+	if s.id != "" {
+		name = fmt.Sprintf("%s-%s", name, s.id)
 	}
 	return name
 }

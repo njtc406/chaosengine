@@ -5,13 +5,12 @@
 // @Update  yr  2024/8/30 下午6:54
 package config
 
-import (
-	"time"
-)
+import "time"
 
 type Config struct {
-	RPCServer *RPCServer `binding:"required"` // rpc服务配置
-	ETCDConf  *ETCDConf
+	RPCServer     *RPCServer             `binding:"required"` // rpc服务配置
+	DiscoveryUse  string                 `binding:""`         // 服务发现方式（默认etcd）
+	DiscoveryConf map[string]interface{} `binding:""`         // 服务发现配置
 }
 
 type RPCServer struct {
@@ -21,15 +20,7 @@ type RPCServer struct {
 	CompressBytesLen int    // 消息超过该值将进行压缩
 }
 
-type ETCDConf struct {
-	EtcdEndPoints []string
-	DialTimeout   time.Duration
-	DiscoveryPath string
-	UserName      string
-	Password      string
-	TTL           time.Duration // 租约过期时间
-}
-
-func (ec *ETCDConf) GetFullPath(uid string) (path string) {
-	return ec.DiscoveryPath + "/" + uid
+type EtcdConf struct {
+	Path string        // 服务发现监听路径
+	TTL  time.Duration // 租约过期时间
 }

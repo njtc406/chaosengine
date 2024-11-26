@@ -72,7 +72,7 @@ func (pool *PoolEx) Get() IPoolData {
 		if data.IsRef() {
 			panic("Pool data is in use.")
 		}
-
+		data.Reset()
 		data.Ref()
 		return data
 	}

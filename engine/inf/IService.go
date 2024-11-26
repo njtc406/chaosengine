@@ -38,15 +38,17 @@ type IServiceHandler interface {
 	GetServiceCfg() interface{}
 	GetServiceEventChannelNum() int
 	GetServiceTimerChannelNum() int
+	GetRpcHandler() IRpcHandler
 }
 
 type IIdentifiable interface {
 	OnSetup(svc IService)
 	SetName(string)
 	GetName() string
-	SetUid(uid string)
-	GetUid() string
+	SetServiceId(id string)
+	GetServiceId() string
 	GetPID() *actor.PID
+	GetServerId() int32
 	IsClosed() bool // 服务是否已经关闭
 }
 

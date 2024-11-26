@@ -1,15 +1,17 @@
 package config
 
 import (
+	"github.com/fsnotify/fsnotify"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/njtc406/chaosutil/validate"
 	"github.com/spf13/viper"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 	"time"
 )
+
+// TODO 增加一个从远程读取配置文件的功能
 
 var (
 	Conf    = new(conf)
@@ -17,12 +19,16 @@ var (
 )
 
 type ConfInfo struct {
-	ServiceName   string             // 服务名称
-	ConfName      string             // 配置文件名称
-	ConfPath      string             // 配置文件路径(这个路径是基于node.Start传入的路径)
-	ConfType      string             // 配置文件类型
-	Cfg           interface{}        // 配置结构体
-	DefaultSetFun func(*viper.Viper) // 默认配置函数
+	ServiceName      string                  // 服务名称
+	ConfName         string                  // 配置文件名称
+	ConfPath         string                  // 配置文件路径(这个路径是基于node.Start传入的路径)
+	ConfType         string                  // 配置文件类型
+	Cfg              interface{}             // 配置结构体
+	DefaultSetFun    func(*viper.Viper)      // 默认配置函数
+	OnChangeFun      func(in fsnotify.Event) // 配置变化处理函数
+	OpenRemote       bool                    // 是否使用远程配置
+	RemoteEndPoints  []string                // 远程配置文件地址
+	RemotePrefixPath string                  // 远程配置监听目录前缀
 }
 
 func Init(nodeConfigPath string) {
@@ -63,42 +69,9 @@ func parseNodeConfig(nodeConfigPath string) {
 		RotationTime: time.Hour * 24,
 	})
 
-	//parser.SetDefault(`SystemLogger.Module`, `error.log`)
-	//parser.SetDefault(`SystemLogger.Level`, `error`)
-	//parser.SetDefault(`SystemLogger.Caller`, true)
-	//parser.SetDefault(`SystemLogger.FullCaller`, false)
-	//parser.SetDefault(`SystemLogger.Color`, false)
-	//parser.SetDefault(`SystemLogger.MaxAge`, time.Hour*24*15)    // 文件保留时间,默认15天
-	//parser.SetDefault(`SystemLogger.RotationTime`, time.Hour*24) // 文件切割时间,默认1天
+	parser.SetDefault(`AntsPoolSize`, 10000)
 
 	parseSystemConfig(parser, Conf)
-
-	// 修正配置
-	fixConf()
-}
-
-func fixConf() {
-	// 如果在环境变量中设置了NODE_ID,则使用环境变量的值
-	nodeIdStr := os.Getenv("NODE_ID")
-	if 0 < len(nodeIdStr) {
-		n, err := strconv.Atoi(nodeIdStr)
-		if err != nil {
-			log.SysLogger.Panic("节点id必须是一个数字")
-		}
-		Conf.NodeConf.ID = int32(n)
-	}
-
-	if 0 == Conf.NodeConf.ID {
-		log.SysLogger.Panic("无法获取节点id,请在配置文件中配置或者在环境变量中设置NODE_ID")
-	}
-
-	nodeType := os.Getenv("NODE_TYPE")
-	if 0 < len(nodeType) {
-		Conf.NodeConf.Type = nodeType
-	}
-	if 0 == len(Conf.NodeConf.Type) {
-		log.SysLogger.Panic("无法获取节点类型,请在环境变量中设置NODE_TYPE")
-	}
 }
 
 // parseServiceConf 解析服务配置文件
@@ -113,8 +86,23 @@ func parseServiceConf(confPath string) {
 		parser.SetConfigName(v.ConfName)                      // 配置文件名称
 		parser.AddConfigPath(path.Join(confPath, v.ConfPath)) // 配置文件路径
 		executeDefaultSet(parser)
-		parseSystemConfig(parser, v.Cfg)
+		if !parseSystemConfig(parser, v.Cfg) {
+			if v.OpenRemote {
+				// 从远程获取配置文件
+			} else {
+				log.SysLogger.Panic("配置文件不存在:" + v.ConfPath + v.ConfName)
+			}
+		}
+		// TODO 监听配置文件变化
+		if v.OnChangeFun != nil {
+			listenConfChange(parser, v.OnChangeFun)
+		}
 	}
+}
+
+func listenConfChange(parser *viper.Viper, onChangeFun func(in fsnotify.Event)) {
+	parser.WatchConfig()
+	parser.OnConfigChange(onChangeFun)
 }
 
 func executeDefaultSet(parser *viper.Viper) {
@@ -125,15 +113,19 @@ func executeDefaultSet(parser *viper.Viper) {
 	}
 }
 
-func parseSystemConfig(parser *viper.Viper, c interface{}) {
+func parseSystemConfig(parser *viper.Viper, c interface{}) bool {
 	if err := parser.ReadInConfig(); err != nil {
-		panic(err)
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			return false
+		}
 	}
 	if err := parser.Unmarshal(c); err != nil {
 		panic(err)
 	} else if err = validate.Struct(Conf); err != nil {
 		panic(validate.TransError(err, validate.ZH))
 	}
+
+	return true
 }
 
 // IsDebug 系统状态
@@ -156,19 +148,15 @@ func RegisterConf(cfgs ...*ConfInfo) {
 			panic(`register conf is nil`)
 		}
 
-		if c.ServiceName == `` {
+		if c.ServiceName == "" {
 			panic(`service name is empty`)
 		}
 
-		if c.ConfName == `` {
+		if c.ConfName == "" {
 			panic(`conf name is empty`)
 		}
 
-		if c.ConfPath == `` {
-			panic(`conf path is empty`)
-		}
-
-		if c.ConfType == `` {
+		if c.ConfType == "" {
 			panic(`conf type is empty`)
 		}
 

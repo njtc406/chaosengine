@@ -7,7 +7,7 @@ package inf
 
 import (
 	"github.com/njtc406/chaosengine/engine/actor"
-	"github.com/njtc406/chaosengine/engine/def"
+	"github.com/njtc406/chaosengine/engine/dto"
 	"time"
 )
 
@@ -15,7 +15,7 @@ type IEnvelope interface {
 	IDataDef
 	// Set
 
-	SetHeaders(header def.Header)
+	SetHeaders(header dto.Header)
 	SetHeader(key string, value string)
 	SetSender(sender *actor.PID)
 	SetReceiver(receiver *actor.PID)
@@ -29,12 +29,12 @@ type IEnvelope interface {
 	SetError(err error)
 	SetErrStr(err string)
 	SetNeedResponse(need bool)
-	SetCallback(cbs []def.CompletionFunc)
+	SetCallback(cbs []dto.CompletionFunc)
 
 	// Get
 
 	GetHeader(key string) string
-	GetHeaders() def.Header
+	GetHeaders() dto.Header
 	GetSender() *actor.PID
 	GetReceiver() *actor.PID
 	GetSenderClient() IRpcSender

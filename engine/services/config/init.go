@@ -16,13 +16,18 @@ func parseClusterConfig(nodeConfigPath string) map[string]*def.ServiceInitConf {
 
 	// 设置配置文件
 	parser.SetConfigType(`yaml`)         // 配置文件类型
-	parser.SetConfigName(`cluster`)      // 配置文件名称
+	parser.SetConfigName(`service`)      // 配置文件名称
 	parser.AddConfigPath(nodeConfigPath) // 配置文件路径
 
 	conf := new(config)
 	parseSystemConfig(parser, conf)
 
-	return conf.Services
+	var ret = make(map[string]*def.ServiceInitConf)
+	for _, v := range conf.Services {
+		ret[v.Name] = v
+	}
+
+	return ret
 }
 
 func parseSystemConfig(parser *viper.Viper, c interface{}) {

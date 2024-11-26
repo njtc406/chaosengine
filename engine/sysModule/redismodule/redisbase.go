@@ -9,8 +9,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/njtc406/chaosengine/engine/errdef/errcode"
-	"github.com/njtc406/chaosutil/chaoserrors"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -39,9 +37,9 @@ func (r *RedisBase) HSet(tx *redis.Tx, key string, fields map[string]interface{}
 	return nil
 }
 
-func (r *RedisBase) HGetAll(tx *redis.Client, key string, result interface{}) chaoserrors.CError {
+func (r *RedisBase) HGetAll(tx *redis.Client, key string, result interface{}) error {
 	if err := tx.HGetAll(context.Background(), key).Scan(result); err != nil {
-		return chaoserrors.NewErrCode(errcode.DBRedisError, "redis查询错误", err)
+		return err
 	}
 	return nil
 }

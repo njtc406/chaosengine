@@ -7,7 +7,7 @@ package monitor
 
 import (
 	"fmt"
-	"github.com/njtc406/chaosengine/engine/def"
+	"github.com/njtc406/chaosengine/engine/dto"
 	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/msgenvelope"
@@ -35,11 +35,12 @@ func GetRpcMonitor() *RpcMonitor {
 	return rpcMonitor
 }
 
-func (rm *RpcMonitor) Init() {
+func (rm *RpcMonitor) Init() inf.IMonitor {
 	rm.closed = make(chan struct{})
 	rm.waitMap = make(map[uint64]inf.IEnvelope)
 	rm.th.Init()
 	rm.ticker = time.NewTicker(time.Millisecond * 100)
+	return rm
 }
 
 func (rm *RpcMonitor) Start() {
@@ -153,7 +154,7 @@ func (rm *RpcMonitor) futureCallTimeout(envelope inf.IEnvelope) {
 	}
 }
 
-func (rm *RpcMonitor) NewCancel(id uint64) def.CancelRpc {
+func (rm *RpcMonitor) NewCancel(id uint64) dto.CancelRpc {
 	return func() {
 		rm.Remove(id)
 	}

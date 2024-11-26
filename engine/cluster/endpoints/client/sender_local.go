@@ -10,6 +10,7 @@ import (
 	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/monitor"
+	"github.com/njtc406/chaosengine/engine/utils/log"
 )
 
 // LocalSender 本地服务的Client
@@ -37,13 +38,17 @@ func (lc *LocalSender) SendRequest(envelope inf.IEnvelope) error {
 func (lc *LocalSender) SendResponse(envelope inf.IEnvelope) error {
 	monitor.GetRpcMonitor().Remove(envelope.GetReqId()) // 回复时先移除监控,防止超时
 	if lc.IsClosed() {
+		envelope.SetError(errdef.ServiceNotFound)
+		envelope.Done()
 		return errdef.ServiceNotFound
 	}
 
 	if envelope.NeedCallback() {
+		log.SysLogger.Debugf("--------------<<<<<<<<<<<<< response need call back")
 		// 本地调用的回复消息,直接发送到对应service的邮箱处理
 		return lc.PushRequest(envelope)
 	} else {
+		log.SysLogger.Debugf("---------------<<<<<<<<<<<< response not need call back")
 		// 同步调用,直接设置调用结束
 		envelope.Done()
 	}

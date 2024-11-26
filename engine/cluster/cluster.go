@@ -11,6 +11,7 @@ import (
 	"github.com/njtc406/chaosengine/engine/cluster/endpoints"
 	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/event"
+	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/asynclib"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 )
@@ -27,34 +28,35 @@ type Cluster struct {
 	conf *config.Config
 
 	// 服务发现
-	discovery *discovery.Discovery
+	discovery inf.IDiscovery
 
 	// 节点列表
 	endpoints *endpoints.EndpointManager
 
 	// 事件
-	eventProcessor event.IProcessor
-	eventChannel   chan event.IEvent
+	eventProcessor inf.IProcessor
+	eventChannel   chan inf.IEvent
 }
 
 func (c *Cluster) initConfig(confPath string) {
 	c.conf = config.Init(confPath)
 }
 
-func (c *Cluster) Init(nodeId int32, nodeType, confPath string) {
+func (c *Cluster) Init(confPath string) {
 	// 加载集群配置
 	c.initConfig(confPath)
 
 	c.closed = make(chan struct{})
-	c.eventChannel = make(chan event.IEvent, 1024)
+	c.eventChannel = make(chan inf.IEvent, 1024)
 	c.eventProcessor = event.NewProcessor()
 	c.eventProcessor.Init(c)
 
 	c.endpoints = endpoints.GetEndpointManager()
-	c.endpoints.Init(nodeId, nodeType, c.conf.RPCServer.Addr, c.eventProcessor)
+	c.endpoints.Init(c.conf.RPCServer.Addr, c.eventProcessor)
 
-	c.discovery = discovery.NewDiscovery()
-	if err := c.discovery.Init(c.conf.ETCDConf, c.eventProcessor); err != nil {
+	c.discovery = discovery.CreateDiscovery(c.conf.DiscoveryUse)
+	log.SysLogger.Debugf("discovery use %s    conf:%+v", c.conf.DiscoveryUse, c.conf.DiscoveryConf[c.conf.DiscoveryUse])
+	if err := c.discovery.Init(c.conf.DiscoveryConf[c.conf.DiscoveryUse], c.eventProcessor); err != nil {
 		log.SysLogger.Fatalf("init discovery error:%v", err)
 	}
 }
@@ -73,7 +75,7 @@ func (c *Cluster) Close() {
 	c.discovery.Close()
 }
 
-func (c *Cluster) PushEvent(ev event.IEvent) error {
+func (c *Cluster) PushEvent(ev inf.IEvent) error {
 	select {
 	case c.eventChannel <- ev:
 	default:
@@ -87,7 +89,7 @@ func (c *Cluster) run() {
 		select {
 		case ev := <-c.eventChannel:
 			if ev != nil {
-				switch ev.GetEventType() {
+				switch ev.GetType() {
 				case event.SysEventETCDPut, event.SysEventETCDDel:
 					e := ev.(*event.Event)
 					c.eventProcessor.EventHandler(e)

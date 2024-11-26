@@ -183,6 +183,9 @@ func (m *MysqlModule) ExecuteFun(f Callback, args ...interface{}) (interface{}, 
 			log.SysLogger.Errorf("mysql execute function panic: %v\ntrace:%s", r, debug.Stack())
 		}
 	}()
+
+	log.SysLogger.Debugf("==============================11111111111111111111111")
+
 	return f(m.client, args...)
 }
 

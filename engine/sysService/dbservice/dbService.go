@@ -51,10 +51,7 @@ func (db *DBService) OnInit() error {
 	db.redisModule = redismodule.NewRedisModule()
 	db.redisModule.Init(conf.RedisConf)
 	db.mysqlModule = mysqlmodule.NewMysqlModule()
-	db.mysqlModule.InitConn(conf.MysqlConf, nodeConfig.Conf.NodeConf.ID)
-
-	// 设置线程数
-	db.SetGoRoutineNum(conf.GoroutineNum)
+	db.mysqlModule.InitConn(conf.MysqlConf, db.GetServerId())
 
 	db.AddModule(db.redisModule)
 	db.AddModule(db.mysqlModule)
@@ -98,6 +95,7 @@ func (db *DBService) APIExecuteMysqlFun(f mysqlmodule.Callback, args ...interfac
 	return db.mysqlModule.ExecuteFun(f, args...)
 }
 
+// APIExecuteMysqlTransaction 执行mysql事务
 func (db *DBService) APIExecuteMysqlTransaction(funcList ...mysqlmodule.TransactionCallback) error {
 	return db.mysqlModule.ExecuteTransaction(funcList...)
 }

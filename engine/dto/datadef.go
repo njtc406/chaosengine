@@ -1,9 +1,9 @@
-// Package def
+// Package dto
 // @Title  title
 // @Description  desc
 // @Author  yr  2024/11/14
 // @Update  yr  2024/11/14
-package def
+package dto
 
 import "sync/atomic"
 

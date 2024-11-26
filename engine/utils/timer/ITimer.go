@@ -3,7 +3,7 @@
 // @Description  desc
 // @Author  yr  2024/11/14
 // @Update  yr  2024/11/14
-package inf
+package timer
 
 import "time"
 

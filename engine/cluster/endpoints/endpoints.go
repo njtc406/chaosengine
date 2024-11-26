@@ -20,8 +20,8 @@ import (
 var endMgr = &EndpointManager{}
 
 type EndpointManager struct {
-	event.IProcessor
-	event.IHandler
+	inf.IProcessor
+	inf.IHandler
 
 	remote     *remote.Remote         // 通讯器
 	stopped    bool                   // 是否已停止
@@ -32,8 +32,8 @@ func GetEndpointManager() *EndpointManager {
 	return endMgr
 }
 
-func (em *EndpointManager) Init(nodeId int32, nodeType, addr string, eventProcessor event.IProcessor) {
-	em.remote = remote.NewRemote(nodeId, nodeType, addr, new(RPCListener))
+func (em *EndpointManager) Init(addr string, eventProcessor inf.IProcessor) {
+	em.remote = remote.NewRemote(addr, new(RPCListener))
 	em.remote.Init()
 
 	em.IProcessor = eventProcessor
@@ -62,7 +62,7 @@ func (em *EndpointManager) Stop() {
 }
 
 // updateServiceInfo 更新远程服务信息事件
-func (em *EndpointManager) updateServiceInfo(e event.IEvent) {
+func (em *EndpointManager) updateServiceInfo(e inf.IEvent) {
 	//log.SysLogger.Debugf("endpoints receive update service event: %+v", e)
 	ev := e.(*event.Event)
 	kv := ev.Data.(*mvccpb.KeyValue)
@@ -83,7 +83,7 @@ func (em *EndpointManager) updateServiceInfo(e event.IEvent) {
 }
 
 // removeServiceInfo 删除远程服务信息事件
-func (em *EndpointManager) removeServiceInfo(e event.IEvent) {
+func (em *EndpointManager) removeServiceInfo(e inf.IEvent) {
 	ev := e.(*event.Event)
 	kv := ev.Data.(*mvccpb.KeyValue)
 	if kv.Value != nil {
@@ -98,8 +98,8 @@ func (em *EndpointManager) removeServiceInfo(e event.IEvent) {
 }
 
 // AddService 添加本地服务到服务发现中
-func (em *EndpointManager) AddService(serverId int32, serviceID, serviceName string, version int64, rpcHandler inf.IRpcHandler) *actor.PID {
-	pid := actor.NewPID(em.remote.GetNodeId(), em.remote.GetNodeType(), em.remote.GetAddress(), serverId, serviceID, serviceName, version)
+func (em *EndpointManager) AddService(serverId int32, serviceId, serviceType, serviceName string, version int64, rpcHandler inf.IRpcHandler) *actor.PID {
+	pid := actor.NewPID(em.remote.GetAddress(), serverId, serviceId, serviceType, serviceName, version)
 	log.SysLogger.Debugf("add local service: %s, pid: %v", pid.String(), rpcHandler)
 	em.repository.Add(client.NewLClient(pid, rpcHandler))
 
@@ -140,6 +140,6 @@ func (em *EndpointManager) SelectByRule(sender *actor.PID, rule func(pid *actor.
 	return em.repository.SelectByRule(sender, rule)
 }
 
-func (em *EndpointManager) SelectByNodeType(sender *actor.PID, nodeType, serviceName string) inf.IBus {
-	return em.repository.SelectByNodeType(sender, nodeType, serviceName)
+func (em *EndpointManager) SelectByServiceType(sender *actor.PID, nodeType, serviceName string) inf.IBus {
+	return em.repository.SelectByServiceType(sender, nodeType, serviceName)
 }

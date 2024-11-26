@@ -1,6 +1,6 @@
 // Package pprofservice
-// @Title  请填写文件名称（需要改）
-// @Description  请填写文件描述（需要改）
+// @Title  性能性分析服务
+// @Description  性能性分析服务
 // @Author  yr  2024/8/21 下午5:00
 // @Update  yr  2024/8/21 下午5:00
 package pprofservice
@@ -20,6 +20,14 @@ import (
 
 func init() {
 	node.SetupBase(&PprofService{})
+	nodeConfig.RegisterConf(&nodeConfig.ConfInfo{
+		ServiceName:   "PprofService",
+		ConfName:      "pprof",
+		ConfType:      "yaml",
+		ConfPath:      "",
+		Cfg:           &config.PprofConf{},
+		DefaultSetFun: config.SetPprofConfDefault,
+	})
 }
 
 type PprofService struct {
@@ -33,7 +41,7 @@ func (ps *PprofService) getConf() *config.PprofConf {
 }
 
 func (ps *PprofService) OnInit() error {
-	ps.httpModule = httpmodule.NewHttpModule(ps.getConf().Conf, log.SysLogger, nodeConfig.Conf.SystemStatus)
+	ps.httpModule = httpmodule.NewHttpModule(ps.getConf().PprofConf, log.SysLogger, nodeConfig.Conf.SystemStatus)
 	ps.httpModule.SetRouter(ps.initRouter())
 	_, err := ps.AddModule(ps.httpModule)
 	if err != nil {
@@ -61,5 +69,5 @@ func (ps *PprofService) OnStart() error {
 }
 
 func (ps *PprofService) OnRelease() {
-	ps.httpModule.OnRelease()
+	ps.ReleaseAllChildModule()
 }

@@ -6,6 +6,7 @@
 package remote
 
 import (
+	"github.com/google/uuid"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/smallnest/rpcx/server"
@@ -13,17 +14,15 @@ import (
 
 type Remote struct {
 	address  string // 服务监听地址
-	nodeId   int32  // 节点唯一ID
-	nodeType string // 节点类型
+	nodeUid  string // 节点唯一ID
 	listener inf.IRpcListener
 	svr      *server.Server
 }
 
-func NewRemote(nodeId int32, nodeType, address string, listener inf.IRpcListener) *Remote {
+func NewRemote(address string, listener inf.IRpcListener) *Remote {
 	return &Remote{
 		address:  address,
-		nodeId:   nodeId,
-		nodeType: nodeType,
+		nodeUid:  uuid.NewString(),
 		listener: listener,
 	}
 }
@@ -51,10 +50,6 @@ func (r *Remote) GetAddress() string {
 	return r.address
 }
 
-func (r *Remote) GetNodeId() int32 {
-	return r.nodeId
-}
-
-func (r *Remote) GetNodeType() string {
-	return r.nodeType
+func (r *Remote) GetNodeUid() string {
+	return r.nodeUid
 }

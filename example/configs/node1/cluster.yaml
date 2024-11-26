@@ -1,0 +1,21 @@
+
+# 集群配置
+
+# rpc监听
+RPCServer:
+  # 监听地址
+  Addr: 0.0.0.0:6688
+  # 协议
+  Protoc: "tcp"
+  # 最大rpc参数长度(默认 2097152=2M)
+  MaxRpcParamLen: 2097152
+  # 压缩参数,消息长度超过该值,将进行压缩(默认 1048576=1M)
+  CompressBytesLen: 1048576
+
+DiscoveryUse: etcd
+
+DiscoveryConf:
+  etcd:
+    # 服务发现的监听路径
+    Path: /server/service
+    TTLSecond: 30s
