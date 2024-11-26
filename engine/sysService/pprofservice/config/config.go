@@ -12,7 +12,7 @@ import (
 )
 
 type PprofConf struct {
-	Conf *httpmodule.Conf `binding:"required"`
+	PprofConf *httpmodule.Conf `binding:"required"`
 }
 
 func SetPprofConfDefault(parser *viper.Viper) {

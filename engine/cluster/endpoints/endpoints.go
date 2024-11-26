@@ -32,8 +32,8 @@ func GetEndpointManager() *EndpointManager {
 	return endMgr
 }
 
-func (em *EndpointManager) Init(nodeId int32, addr string, eventProcessor inf.IProcessor) {
-	em.remote = remote.NewRemote(nodeId, addr, new(RPCListener))
+func (em *EndpointManager) Init(addr string, eventProcessor inf.IProcessor) {
+	em.remote = remote.NewRemote(addr, new(RPCListener))
 	em.remote.Init()
 
 	em.IProcessor = eventProcessor
@@ -99,7 +99,7 @@ func (em *EndpointManager) removeServiceInfo(e inf.IEvent) {
 
 // AddService 添加本地服务到服务发现中
 func (em *EndpointManager) AddService(serverId int32, serviceId, serviceType, serviceName string, version int64, rpcHandler inf.IRpcHandler) *actor.PID {
-	pid := actor.NewPID(em.remote.GetNodeId(), em.remote.GetAddress(), serverId, serviceId, serviceType, serviceName, version)
+	pid := actor.NewPID(em.remote.GetAddress(), serverId, serviceId, serviceType, serviceName, version)
 	log.SysLogger.Debugf("add local service: %s, pid: %v", pid.String(), rpcHandler)
 	em.repository.Add(client.NewLClient(pid, rpcHandler))
 

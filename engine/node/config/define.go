@@ -19,6 +19,7 @@ type conf struct {
 	NodeConf         *node           `binding:"omitempty"`           // 节点配置(允许为空, 可以从环境变量中获取)
 	ProfilerInterval time.Duration   `binding:""`                    // 性能分析间隔
 	AntsPoolSize     int             `binding:""`                    // 线程池大小
+	ETCDConf         *ETCDConf
 }
 
 func (s *conf) GetSystemLoggerFileName() string {
@@ -31,4 +32,11 @@ func (s *conf) GetSystemLoggerFileName() string {
 
 type node struct {
 	ID int32 `json:"id"` // 节点id
+}
+
+type ETCDConf struct {
+	EtcdEndPoints []string
+	DialTimeout   time.Duration
+	UserName      string
+	Password      string
 }

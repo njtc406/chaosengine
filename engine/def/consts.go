@@ -46,3 +46,7 @@ const (
 const (
 	DefaultHttpRespCode = 0 // 正常
 )
+
+const (
+	DefaultModuleIdSeed = 1_000_000 // 默认的moduleId开始序号
+)

@@ -63,7 +63,7 @@ func NewDefaultLogger(filePath, fileName string, maxAge, rotationTime time.Durat
 			filePath = "./" // 默认当前目录
 		}
 		if rotationTime < time.Second*60 || rotationTime > time.Hour*24 {
-			return nil, DefaultRotationTimeErr
+			return nil, RotationTimeErr
 		}
 		pattern := "_%Y%m%d.log"
 		if rotationTime < time.Minute*60 {

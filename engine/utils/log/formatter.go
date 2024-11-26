@@ -82,9 +82,7 @@ func (f *Formatter) Format(entry *logrus.Entry) ([]byte, error) {
 
 	// output buffer
 	b := f.bufPool.Get()
-	defer func() {
-		f.bufPool.Put(b)
-	}()
+	defer f.bufPool.Put(b)
 
 	// write time
 	timestampFormat := f.TimestampFormat

@@ -1,14 +1,12 @@
 ## 系统基础配置
 
-# 系统状态(debug/release)
-SystemStatus: debug
-
 # 节点信息配置
 NodeConf:
   # 节点id
   ID: 1
-  # 节点类型
-  Type: login
+
+# 系统状态(debug/release)
+SystemStatus: debug
 
 # 系统线程池大小
 AntsPoolSize: 10000
@@ -26,7 +24,7 @@ ProfilerInterval: 10s
 SystemLogger:
   # 日志文件名
   Name: "game"
-  # 日志级别
+  # 日志级别(trace debug info warn error fatal panic)
   Level: debug
   # 是否打印调用文件信息
   Caller: true

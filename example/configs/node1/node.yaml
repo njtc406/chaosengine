@@ -3,6 +3,9 @@
 # 系统状态(debug/release)
 SystemStatus: debug
 
+# 系统线程池大小
+AntsPoolSize: 10000
+
 # 系统缓存目录
 CachePath: ./cache/
 
@@ -16,7 +19,7 @@ ProfilerInterval: 10s
 SystemLogger:
   # 日志文件名
   Name: "game"
-  # 日志级别
+  # 日志级别(trace debug info warn error fatal panic)
   Level: debug
   # 是否打印调用文件信息
   Caller: true
@@ -29,9 +32,12 @@ SystemLogger:
   # 日志切分周期(默认24h)
   RotationTime: 24h
 
-# 节点信息配置
-NodeConf:
-  # 节点id
-  ID: 1001
-  # 节点类型
-  Type: game
+ETCDConf:
+  # etcd地址
+  EtcdEndPoints:
+    - 192.168.145.188:2379
+  DialTimeout: 3s
+  # etcd用户名
+  UserName: root
+  # etcd密码
+  Password: 123456

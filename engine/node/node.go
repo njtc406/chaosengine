@@ -39,10 +39,6 @@ func init() {
 	signal.Notify(exitCh, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
 }
 
-func GetNodeID() int32 {
-	return config.Conf.NodeConf.ID
-}
-
 func SetStartHook(f ...func()) {
 	hooks = append(hooks, f...)
 }
@@ -64,7 +60,7 @@ func Start(v string, confPath string) {
 	monitor.GetRpcMonitor().Init().Start()
 
 	// 初始化集群设置
-	cluster.GetCluster().Init(config.Conf.NodeConf.ID, confPath)
+	cluster.GetCluster().Init(confPath)
 	// 启动集群管理器
 	cluster.GetCluster().Start()
 

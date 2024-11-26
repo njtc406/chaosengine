@@ -28,7 +28,7 @@ type Cluster struct {
 	conf *config.Config
 
 	// 服务发现
-	discovery *discovery.Discovery
+	discovery inf.IDiscovery
 
 	// 节点列表
 	endpoints *endpoints.EndpointManager
@@ -42,7 +42,7 @@ func (c *Cluster) initConfig(confPath string) {
 	c.conf = config.Init(confPath)
 }
 
-func (c *Cluster) Init(nodeId int32, confPath string) {
+func (c *Cluster) Init(confPath string) {
 	// 加载集群配置
 	c.initConfig(confPath)
 
@@ -52,10 +52,11 @@ func (c *Cluster) Init(nodeId int32, confPath string) {
 	c.eventProcessor.Init(c)
 
 	c.endpoints = endpoints.GetEndpointManager()
-	c.endpoints.Init(nodeId, c.conf.RPCServer.Addr, c.eventProcessor)
+	c.endpoints.Init(c.conf.RPCServer.Addr, c.eventProcessor)
 
-	c.discovery = discovery.NewDiscovery()
-	if err := c.discovery.Init(c.conf.ETCDConf, c.eventProcessor); err != nil {
+	c.discovery = discovery.CreateDiscovery(c.conf.DiscoveryUse)
+	log.SysLogger.Debugf("discovery use %s    conf:%+v", c.conf.DiscoveryUse, c.conf.DiscoveryConf[c.conf.DiscoveryUse])
+	if err := c.discovery.Init(c.conf.DiscoveryConf[c.conf.DiscoveryUse], c.eventProcessor); err != nil {
 		log.SysLogger.Fatalf("init discovery error:%v", err)
 	}
 }

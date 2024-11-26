@@ -12,15 +12,10 @@ RPCServer:
   # 压缩参数,消息长度超过该值,将进行压缩(默认 1048576=1M)
   CompressBytesLen: 1048576
 
-ETCDConf:
-  # etcd地址
-  EtcdEndPoints:
-    - 127.0.0.1:2379
-  # 服务发现的监听路径
-  DiscoveryPath: /server/service
-  TTLSecond: 30s
-  DialTimeout: 3s
-  # etcd用户名
-  UserName: root
-  # etcd密码
-  Password: 123456
+DiscoveryUse: etcd
+
+DiscoveryConf:
+  etcd:
+    # 服务发现的监听路径
+    Path: /server/service
+    TTLSecond: 30s

@@ -75,7 +75,7 @@ func (m *Module) AddModule(module inf.IModule) (uint32, error) {
 
 	log.SysLogger.Debugf("add module [%s] completed", pModule.GetModuleName())
 
-	return pModule.GetModuleID(), nil
+	return pModule.moduleId, nil
 }
 
 func (m *Module) OnInit() error {
@@ -85,8 +85,7 @@ func (m *Module) OnInit() error {
 func (m *Module) OnRelease() {}
 
 func (m *Module) newModuleID() uint32 {
-	m.root.GetBaseModule().(*Module).moduleIdSeed++
-	return m.root.GetBaseModule().(*Module).moduleIdSeed
+	return atomic.AddUint32(&m.root.GetBaseModule().(*Module).moduleIdSeed, 1)
 }
 
 func (m *Module) NewModuleID() uint32 {

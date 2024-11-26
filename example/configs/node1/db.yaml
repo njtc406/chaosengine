@@ -4,8 +4,9 @@ MysqlConf:
   UserName: root
   Passwd: 123456
   Net: tcp
-  Addr: 192.168.0.188:3306
-  DBNamePrefix: game
+  Addr: 192.168.145.188:3306
+  # 数据库名字前缀(通常是 前缀_serverId)
+  DBNamePrefix: login
   TimeZone: Local
   Timeout: 10s
   ReadTimeout: 10s
@@ -13,7 +14,7 @@ MysqlConf:
 
 # redis数据库配置
 RedisConf:
-  Addr: 192.168.0.188:6379
+  Addr: 192.168.145.188:6379
   DB: 0
   PoolSize: 100
   MinIdleConns: 10

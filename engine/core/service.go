@@ -97,7 +97,7 @@ func (s *Service) Init(svc interface{}, serviceInitConf *def.ServiceInitConf, cf
 	s.self = svc.(inf.IModule)
 	s.root = s.self
 	s.rootContains = make(map[uint32]inf.IModule)
-	s.moduleIdSeed = 1
+	s.moduleIdSeed = def.DefaultModuleIdSeed
 	s.eventProcessor = event.NewProcessor()
 	s.eventProcessor.Init(s)
 	s.eventHandler = event.NewHandler()
@@ -289,6 +289,10 @@ func (s *Service) SetServiceId(id string) {
 
 func (s *Service) GetServiceId() string {
 	return s.id
+}
+
+func (s *Service) GetServerId() int32 {
+	return s.serverId
 }
 
 func (s *Service) GetPID() *actor.PID {
