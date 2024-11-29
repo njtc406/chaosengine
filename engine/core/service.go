@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/njtc406/chaosengine/engine/actor"
 	"github.com/njtc406/chaosengine/engine/cluster/endpoints"
+	"github.com/njtc406/chaosengine/engine/config"
 	"github.com/njtc406/chaosengine/engine/def"
 	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/event"
@@ -33,6 +34,7 @@ type Service struct {
 	id          string // 服务唯一id(针对本地节点的相同服务名称中唯一)
 	name        string // 服务名称
 	serviceType string // 服务类型
+	rpcType     string // 远程调用类型(默认rpcx)
 	serverId    int32  // 服务id
 	version     int64  // 服务版本
 
@@ -49,22 +51,44 @@ type Service struct {
 	eventProcessor inf.IProcessor // 事件管理器
 }
 
-func (s *Service) Init(svc interface{}, serviceInitConf *def.ServiceInitConf, cfg interface{}) {
+func (s *Service) fixConf(serviceInitConf *config.ServiceInitConf) {
 	if serviceInitConf == nil {
-		serviceInitConf = &def.ServiceInitConf{
-			Name:         "",
+		serviceInitConf = &config.ServiceInitConf{
+			ServiceName:  "",
+			Type:         "Normal",
 			ServerId:     0,
 			TimerSize:    def.DefaultTimerSize,
 			MailBoxSize:  def.DefaultMailBoxSize,
 			GoroutineNum: def.DefaultGoroutineNum,
+			RpcType:      def.DefaultRpcTypeRpcx,
 		}
+		return
 	}
 
+	if serviceInitConf.Type == "" {
+		serviceInitConf.Type = "Normal"
+	}
+	if serviceInitConf.RpcType == "" {
+		serviceInitConf.RpcType = def.DefaultRpcTypeRpcx
+	}
+	if serviceInitConf.TimerSize == 0 {
+		serviceInitConf.TimerSize = def.DefaultTimerSize
+	}
+	if serviceInitConf.MailBoxSize == 0 {
+		serviceInitConf.MailBoxSize = def.DefaultMailBoxSize
+	}
+	if serviceInitConf.GoroutineNum == 0 {
+		serviceInitConf.GoroutineNum = def.DefaultGoroutineNum
+	}
+}
+
+func (s *Service) Init(svc interface{}, serviceInitConf *config.ServiceInitConf, cfg interface{}) {
+	// 整理配置参数
+	s.fixConf(serviceInitConf)
+	log.SysLogger.Debugf("service[%s] init conf: %+v", s.GetName(), serviceInitConf)
 	// 初始化服务数据
 	s.serviceType = serviceInitConf.Type
-	if s.serviceType == "" {
-		s.serviceType = "Unknown"
-	}
+	s.rpcType = serviceInitConf.RpcType
 	s.serverId = serviceInitConf.ServerId
 	s.src = svc.(inf.IService)
 	s.cfg = cfg
@@ -72,23 +96,12 @@ func (s *Service) Init(svc interface{}, serviceInitConf *def.ServiceInitConf, cf
 		s.closeSignal = make(chan struct{})
 	}
 	if s.timerDispatcher == nil {
-		var timerSize int
-		if serviceInitConf.TimerSize == 0 {
-			timerSize = def.DefaultTimerSize
-		}
-		s.timerDispatcher = timer.NewDispatcher(timerSize)
+		s.timerDispatcher = timer.NewDispatcher(serviceInitConf.TimerSize)
 	}
 	if s.mailBox == nil {
-		var mailBoxSize int
-		if serviceInitConf.MailBoxSize == 0 {
-			mailBoxSize = def.DefaultMailBoxSize
-		}
-		s.mailBox = make(chan inf.IEvent, mailBoxSize)
+		s.mailBox = make(chan inf.IEvent, serviceInitConf.MailBoxSize)
 	}
 	s.goroutineNum = serviceInitConf.GoroutineNum
-	if s.goroutineNum == 0 {
-		s.goroutineNum = def.DefaultGoroutineNum
-	}
 
 	// rpc处理器
 	s.rpcHandler.Init(svc.(inf.IRpcHandler))
@@ -103,6 +116,10 @@ func (s *Service) Init(svc interface{}, serviceInitConf *def.ServiceInitConf, cf
 	s.eventHandler = event.NewHandler()
 	s.eventHandler.Init(s.eventProcessor)
 	s.IConcurrent = concurrent.NewConcurrent()
+
+	if err := s.src.OnInit(); err != nil {
+		log.SysLogger.Panicf("service[%s] onInit error: %s", s.GetName(), err)
+	}
 }
 
 func (s *Service) Start() error {
@@ -112,7 +129,7 @@ func (s *Service) Start() error {
 	}
 	var waitRun sync.WaitGroup
 
-	s.self.(inf.IService).OnStart()
+	s.src.OnStart()
 	for i := int32(0); i < s.goroutineNum; i++ {
 		s.wg.Add(1)
 		waitRun.Add(1)
@@ -125,7 +142,7 @@ func (s *Service) Start() error {
 	waitRun.Wait()
 
 	// 所有服务都注册到服务列表
-	s.pid = endpoints.GetEndpointManager().AddService(s.serverId, s.id, s.serviceType, s.name, s.version, s.GetRpcHandler())
+	s.pid = endpoints.GetEndpointManager().AddService(s.serverId, s.id, s.serviceType, s.name, s.version, s.rpcType, s.GetRpcHandler())
 	log.SysLogger.Infof(" service[%s] pid: %s", s.GetName(), s.pid.String())
 	return nil
 }

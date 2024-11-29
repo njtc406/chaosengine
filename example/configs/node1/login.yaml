@@ -1,12 +1,9 @@
 # http服务
 
 # 游戏服配置
-GameServerConf:
-  Addr: 0.0.0.0:80
+LoginServerConf:
+  Addr: 0.0.0.0:90
   ReadHeaderTimeout: 10s
   IdleTimeout: 30s
   #CachePath: http_cache
   Auth: false
-
-# 是否开启gm指令(正式环境不允许打开)
-GMCMD: true

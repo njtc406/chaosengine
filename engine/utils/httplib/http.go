@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-func checkUrl(u string) string {
+func CheckUrl(u string) string {
 	if strings.Contains(u, `http://`) || strings.Contains(u, `https://`) {
 		return u
 	} else {
@@ -24,7 +24,7 @@ func checkUrl(u string) string {
 }
 
 func Request(method, addr, api string, body interface{}, resData interface{}) error {
-	removeUrl := checkUrl(addr) + api
+	removeUrl := CheckUrl(addr) + api
 
 	//log.SysLogger.Debugf("-->req url: %v", removeUrl)
 	fmt.Println("-->req url: ", removeUrl)

@@ -5,7 +5,6 @@ MysqlConf:
   Passwd: 123456
   Net: tcp
   Addr: 192.168.145.188:3306
-  # 数据库名字前缀(通常是 前缀_serverId)
   DBNamePrefix: login
   TimeZone: Local
   Timeout: 10s
@@ -20,3 +19,6 @@ RedisConf:
   MinIdleConns: 10
   MaxConnAge: 1h
   IdleTimeout: 1h
+
+# db服务线程数
+GoroutineNum: 1

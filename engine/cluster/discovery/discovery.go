@@ -7,11 +7,9 @@ package discovery
 
 import (
 	"context"
-	"github.com/njtc406/chaosengine/engine/cluster/config"
+	config "github.com/njtc406/chaosengine/engine/config"
 	"github.com/njtc406/chaosengine/engine/dto"
-	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/inf"
-	nodeConfig "github.com/njtc406/chaosengine/engine/node/config"
 	"path"
 	"sync"
 	"sync/atomic"
@@ -53,7 +51,6 @@ type EtcdDiscovery struct {
 
 	closed     bool
 	watching   int32
-	conf       *config.EtcdConf
 	client     *clientv3.Client
 	mapWatcher *sync.Map
 	t          *time.Timer
@@ -63,34 +60,30 @@ func NewDiscovery() *EtcdDiscovery {
 	return &EtcdDiscovery{}
 }
 
-func (d *EtcdDiscovery) Init(conf interface{}, eventProcessor inf.IProcessor) (err error) {
-	if conf == nil {
-		return errdef.DiscoveryConfNotFound
-	}
+func (d *EtcdDiscovery) Init(eventProcessor inf.IProcessor) (err error) {
 	d.IProcessor = eventProcessor
 	d.IHandler = event.NewHandler()
 	d.IHandler.Init(d.IProcessor)
-	d.conf = conf.(*config.EtcdConf)
 	d.mapWatcher = &sync.Map{}
 
-	if d.conf.TTL < minWatchTTL {
-		d.conf.TTL = minWatchTTL
+	if config.Conf.ClusterConf.DiscoveryConf.TTL < minWatchTTL {
+		config.Conf.ClusterConf.DiscoveryConf.TTL = minWatchTTL
 	}
 
 	return d.conn()
 }
 
 func (d *EtcdDiscovery) conn() (err error) {
-	if len(nodeConfig.Conf.ETCDConf.EtcdEndPoints) == 0 {
+	if len(config.Conf.ClusterConf.ETCDConf.Endpoints) == 0 {
 		log.SysLogger.Info("etcd end points is empty")
 		return
 	}
 
 	d.client, err = clientv3.New(clientv3.Config{
-		Endpoints:   nodeConfig.Conf.ETCDConf.EtcdEndPoints,
-		DialTimeout: nodeConfig.Conf.ETCDConf.DialTimeout,
-		Username:    nodeConfig.Conf.ETCDConf.UserName,
-		Password:    nodeConfig.Conf.ETCDConf.Password,
+		Endpoints:   config.Conf.ClusterConf.ETCDConf.Endpoints,
+		DialTimeout: config.Conf.ClusterConf.ETCDConf.DialTimeout,
+		Username:    config.Conf.ClusterConf.ETCDConf.UserName,
+		Password:    config.Conf.ClusterConf.ETCDConf.Password,
 		Logger:      zap.NewNop(),
 	})
 	if err == nil {
@@ -154,7 +147,7 @@ func (d *EtcdDiscovery) getAll() {
 		return
 	}
 	// 获取当前所有服务
-	resp, err := d.client.Get(context.Background(), d.conf.Path, clientv3.WithPrefix())
+	resp, err := d.client.Get(context.Background(), config.Conf.ClusterConf.DiscoveryConf.Path, clientv3.WithPrefix())
 	if err != nil {
 		log.SysLogger.Errorf("etcd get service error: %v", err)
 	} else if len(resp.Kvs) > 0 {
@@ -184,7 +177,7 @@ func (d *EtcdDiscovery) watch() {
 		}
 	}()
 
-	changes := d.client.Watch(context.Background(), d.conf.Path, clientv3.WithPrefix())
+	changes := d.client.Watch(context.Background(), config.Conf.ClusterConf.DiscoveryConf.Path, clientv3.WithPrefix())
 
 	for !d.closed {
 		select {
@@ -275,7 +268,7 @@ func (d *EtcdDiscovery) addService(ev inf.IEvent) {
 				d.addWatcherInfo(watcher)
 			}
 			// 注册服务
-			fullPath := path.Join(d.conf.Path, pid.GetServiceUid())
+			fullPath := path.Join(config.Conf.ClusterConf.DiscoveryConf.Path, pid.GetServiceUid())
 			log.SysLogger.Debugf("etcd lease id: %d", watcher.getLeaseID())
 			log.SysLogger.Debugf("etcd full path: %s", fullPath)
 			pidByte, err := protojson.Marshal(pid)
@@ -304,7 +297,7 @@ func (d *EtcdDiscovery) removeService(ev inf.IEvent) {
 			watcher := d.getWatcherInfo(pid)
 			if watcher != nil {
 				// 注销服务
-				_, err := d.client.Delete(context.Background(), path.Join(d.conf.Path, pid.GetServiceUid()))
+				_, err := d.client.Delete(context.Background(), path.Join(config.Conf.ClusterConf.DiscoveryConf.Path, pid.GetServiceUid()))
 				if err != nil {
 					log.SysLogger.Errorf("etcd unregister service error: %v", err)
 				}
@@ -318,7 +311,7 @@ func (d *EtcdDiscovery) removeService(ev inf.IEvent) {
 }
 
 func (d *EtcdDiscovery) newLeaseID() (clientv3.LeaseID, error) {
-	resp, err := d.client.Grant(context.Background(), int64(d.conf.TTL))
+	resp, err := d.client.Grant(context.Background(), int64(config.Conf.ClusterConf.DiscoveryConf.TTL))
 	if err != nil {
 		return 0, err
 	}

@@ -13,21 +13,21 @@ import (
 	"github.com/njtc406/chaosengine/engine/utils/log"
 )
 
-// LocalSender 本地服务的Client
-type LocalSender struct {
+// localSender 本地服务的Client
+type localSender struct {
 	SenderBase
 }
 
-func NewLClient(pid *actor.PID, handler inf.IRpcHandler) inf.IRpcSender {
-	lClient := &LocalSender{}
+func newLClient(pid *actor.PID, handler inf.IRpcHandler) inf.IRpcSender {
+	lClient := &localSender{}
 	lClient.pid = pid
 	lClient.IRpcHandler = handler
 	return lClient
 }
 
-func (lc *LocalSender) Close() {}
+func (lc *localSender) Close() {}
 
-func (lc *LocalSender) SendRequest(envelope inf.IEnvelope) error {
+func (lc *localSender) SendRequest(envelope inf.IEnvelope) error {
 	if lc.IsClosed() {
 		return errdef.ServiceNotFound
 	}
@@ -35,7 +35,7 @@ func (lc *LocalSender) SendRequest(envelope inf.IEnvelope) error {
 	return lc.PushRequest(envelope)
 }
 
-func (lc *LocalSender) SendResponse(envelope inf.IEnvelope) error {
+func (lc *localSender) SendResponse(envelope inf.IEnvelope) error {
 	monitor.GetRpcMonitor().Remove(envelope.GetReqId()) // 回复时先移除监控,防止超时
 	if lc.IsClosed() {
 		envelope.SetError(errdef.ServiceNotFound)
@@ -55,7 +55,7 @@ func (lc *LocalSender) SendResponse(envelope inf.IEnvelope) error {
 	return nil
 }
 
-func (lc *LocalSender) SendRequestAndRelease(envelope inf.IEnvelope) error {
+func (lc *localSender) SendRequestAndRelease(envelope inf.IEnvelope) error {
 	// 本地调用envelope在接收者处理后释放
 	return lc.SendRequest(envelope)
 }

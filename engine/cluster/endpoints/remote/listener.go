@@ -1,21 +1,30 @@
-// Package endpoints
+// Package remote
 // @Title  title
 // @Description  desc
 // @Author  yr  2024/11/8
 // @Update  yr  2024/11/8
-package endpoints
+package remote
 
 import (
 	"context"
 	"github.com/njtc406/chaosengine/engine/actor"
 	"github.com/njtc406/chaosengine/engine/dto"
+	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/monitor"
 	"github.com/njtc406/chaosengine/engine/msgenvelope"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/njtc406/chaosengine/engine/utils/serializer"
 )
 
-type RPCListener struct{}
+type RPCListener struct {
+	cliFactory inf.IRpcSenderFactory
+}
+
+func NewRPCListener(cliFactory inf.IRpcSenderFactory) *RPCListener {
+	return &RPCListener{
+		cliFactory: cliFactory,
+	}
+}
 
 // TODO 处理ReqId重复发送的问题
 
@@ -67,12 +76,12 @@ func (rm *RPCListener) RPCCall(_ context.Context, req *actor.Message, _ *dto.RPC
 		envelope := msgenvelope.NewMsgEnvelope()
 		envelope.SetMethod(req.Method)
 		envelope.SetReceiver(req.Receiver)
-		envelope.SetSenderClient(endMgr.GetClient(req.Sender.GetServiceUid()))
+		envelope.SetSenderClient(rm.cliFactory.GetClient(req.Sender.GetServiceUid()))
 		envelope.SetRequest(request)
 		envelope.SetResponse(nil)
 		envelope.SetReqId(mt.GenSeq())
 		envelope.SetNeedResponse(req.NeedResp)
 
-		return endMgr.GetClient(req.Receiver.GetServiceUid()).SendRequestAndRelease(envelope)
+		return rm.cliFactory.GetClient(req.Receiver.GetServiceUid()).SendRequestAndRelease(envelope)
 	}
 }

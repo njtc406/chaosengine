@@ -15,3 +15,7 @@ type IRpcSender interface {
 	SendRequestAndRelease(envelope IEnvelope) error
 	SendResponse(envelope IEnvelope) error
 }
+
+type IRpcSenderFactory interface {
+	GetClient(serviceUid string) IRpcSender
+}

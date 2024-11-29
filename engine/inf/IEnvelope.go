@@ -48,9 +48,9 @@ type IEnvelope interface {
 
 	// Check
 
-	NeedCallback() bool
-	IsReply() bool
-	NeedResponse() bool
+	NeedCallback() bool // 是否需要回调
+	IsReply() bool      // 是否是回复
+	NeedResponse() bool // 是否需要回复
 
 	// Option
 

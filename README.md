@@ -43,13 +43,24 @@
 - 配置可以远程,可以本地
 ---
 
+### 可使用的环境变量
+````
+CHAOS_CONF_PATH = "./configs"                               // 本地配置文件路径(会优先使用环境变量)
+CHAOS_ETCD_CONF_ENDPOINTS = "127.0.0.1:2379,127.0.0.1:2379" // etcd地址
+CHAOS_ETCD_DIAL_TIMEOUT = 5s                                // 连接超时时间
+CHAOS_ETCD_USERNAME = ""                                    // 用户名
+CHAOS_ETCD_PASSWORD = ""                                    // 密码
+CHAOS_ETCD_CONF_BASE_PATH = "/chaos/node/config/node.yaml"  // 配置文件路径
+````
+---
+
 ## 使用说明
 熟悉origin的童鞋应该可以直接上手,这部分几乎没什么变化,origin的大佬已经做的很简化了
 ### 1. 启动一个节点
 
 ```go
 package main
-import "github.com/njtc406/chaosengine/engine/node"
+import "github.com/njtc406/chaosengine/engine/core/node"
 
 var version = "1.0"         // 版本号
 var configPath = "./configs/login" // 配置路径
@@ -69,7 +80,8 @@ func main() {
 package main
 import (
     "github.com/njtc406/chaosengine/engine/core"
-    "github.com/njtc406/chaosengine/engine/node"
+    "github.com/njtc406/chaosengine/engine/core/node"
+    nodeConfig "github.com/njtc406/chaosengine/engine/core/node/config"
 )
 
 func init() {

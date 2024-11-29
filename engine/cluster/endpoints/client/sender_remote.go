@@ -21,12 +21,12 @@ import (
 
 // 远程服务的Client
 
-type RemoteSender struct {
+type remoteSender struct {
 	SenderBase
 	rpcClient client.XClient
 }
 
-func NewRemoteClient(pid *actor.PID) inf.IRpcSender {
+func newRemoteClient(pid *actor.PID, _ inf.IRpcHandler) inf.IRpcSender {
 	d, _ := client.NewPeer2PeerDiscovery("tcp@"+pid.GetAddress(), "")
 	// 如果调用失败,会自动重试3次
 	rpcClient := client.NewXClient("RPCMonitor", client.Failtry, client.RandomSelect, d, client.Option{
@@ -42,7 +42,7 @@ func NewRemoteClient(pid *actor.PID) inf.IRpcSender {
 		TimeToDisallow:      time.Minute,
 	})
 
-	remoteClient := &RemoteSender{
+	remoteClient := &remoteSender{
 		rpcClient: rpcClient,
 	}
 	remoteClient.pid = pid
@@ -51,7 +51,7 @@ func NewRemoteClient(pid *actor.PID) inf.IRpcSender {
 	return remoteClient
 }
 
-func (rc *RemoteSender) Close() {
+func (rc *remoteSender) Close() {
 	if rc.rpcClient == nil {
 		return
 	}
@@ -61,7 +61,7 @@ func (rc *RemoteSender) Close() {
 	rc.rpcClient = nil
 }
 
-func (rc *RemoteSender) send(envelope inf.IEnvelope) error {
+func (rc *remoteSender) send(envelope inf.IEnvelope) error {
 	defer msgenvelope.ReleaseMsgEnvelope(envelope)
 	if rc.rpcClient == nil {
 		return errdef.RPCHadClosed
@@ -86,17 +86,17 @@ func (rc *RemoteSender) send(envelope inf.IEnvelope) error {
 	return nil
 }
 
-func (rc *RemoteSender) SendRequest(envelope inf.IEnvelope) error {
+func (rc *remoteSender) SendRequest(envelope inf.IEnvelope) error {
 	return rc.send(envelope)
 }
 
-func (rc *RemoteSender) SendRequestAndRelease(envelope inf.IEnvelope) error {
+func (rc *remoteSender) SendRequestAndRelease(envelope inf.IEnvelope) error {
 	// 回收envelope
 	defer msgenvelope.ReleaseMsgEnvelope(envelope)
 	return rc.send(envelope)
 }
 
-func (rc *RemoteSender) SendResponse(envelope inf.IEnvelope) error {
+func (rc *remoteSender) SendResponse(envelope inf.IEnvelope) error {
 	// 回收envelope
 	defer msgenvelope.ReleaseMsgEnvelope(envelope)
 	return rc.send(envelope)

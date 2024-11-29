@@ -7,7 +7,7 @@ package inf
 
 import (
 	"github.com/njtc406/chaosengine/engine/actor"
-	"github.com/njtc406/chaosengine/engine/def"
+	"github.com/njtc406/chaosengine/engine/config"
 	"github.com/njtc406/chaosengine/engine/profiler"
 	"github.com/njtc406/chaosengine/engine/utils/concurrent"
 )
@@ -25,7 +25,7 @@ type IService interface {
 
 // ILifecycle 服务生命周期
 type ILifecycle interface {
-	Init(src interface{}, serviceInitConf *def.ServiceInitConf, cfg interface{})
+	Init(src interface{}, serviceInitConf *config.ServiceInitConf, cfg interface{})
 	Start() error
 	Stop()
 	OnInit() error

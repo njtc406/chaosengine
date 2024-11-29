@@ -6,10 +6,10 @@
 package dbservice
 
 import (
+	sysConfig "github.com/njtc406/chaosengine/engine/config"
 	"github.com/njtc406/chaosengine/engine/core"
-	"github.com/njtc406/chaosengine/engine/node"
-	nodeConfig "github.com/njtc406/chaosengine/engine/node/config"
-
+	"github.com/njtc406/chaosengine/engine/inf"
+	"github.com/njtc406/chaosengine/engine/services"
 	"github.com/njtc406/chaosengine/engine/sysModule/mysqlmodule"
 	"github.com/njtc406/chaosengine/engine/sysModule/redismodule"
 	"github.com/njtc406/chaosengine/engine/sysService/dbservice/config"
@@ -21,14 +21,17 @@ import (
 )
 
 func init() {
-	node.SetupBase(&DBService{})
-	nodeConfig.RegisterConf(&nodeConfig.ConfInfo{
+	services.SetService("DBService", func() inf.IService { return &DBService{} })
+	sysConfig.RegisterServiceConf(&sysConfig.ServiceConfig{
 		ServiceName:   "DBService",
 		ConfName:      "db",
 		ConfType:      "yaml",
 		ConfPath:      "",
-		Cfg:           &config.DBService{},
+		CfgCreator:    func() interface{} { return &config.DBService{} },
 		DefaultSetFun: config.DefaultDBService,
+		OnChangeFun: func() {
+			// TODO 配置变更回调
+		},
 	})
 }
 

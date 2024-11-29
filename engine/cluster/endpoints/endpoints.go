@@ -10,6 +10,8 @@ import (
 	"github.com/njtc406/chaosengine/engine/cluster/endpoints/client"
 	"github.com/njtc406/chaosengine/engine/cluster/endpoints/remote"
 	"github.com/njtc406/chaosengine/engine/cluster/endpoints/repository"
+	"github.com/njtc406/chaosengine/engine/config"
+	"github.com/njtc406/chaosengine/engine/def"
 	"github.com/njtc406/chaosengine/engine/event"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/log"
@@ -23,7 +25,7 @@ type EndpointManager struct {
 	inf.IProcessor
 	inf.IHandler
 
-	remote     *remote.Remote         // 通讯器
+	remote     inf.IRemoteServer      // 通讯器(这里之后可以根据类型扩展为多个)
 	stopped    bool                   // 是否已停止
 	repository *repository.Repository // 服务存储仓库
 }
@@ -32,9 +34,10 @@ func GetEndpointManager() *EndpointManager {
 	return endMgr
 }
 
-func (em *EndpointManager) Init(addr string, eventProcessor inf.IProcessor) {
-	em.remote = remote.NewRemote(addr, new(RPCListener))
-	em.remote.Init()
+func (em *EndpointManager) Init(eventProcessor inf.IProcessor) *EndpointManager {
+	em.remote = remote.GetRemote(def.DefaultRpcTypeRpcx)
+	log.SysLogger.Debugf("cluster rpc server config: %+v", config.Conf.ClusterConf.RPCServer)
+	em.remote.Init(config.Conf.ClusterConf.RPCServer, em)
 
 	em.IProcessor = eventProcessor
 
@@ -44,6 +47,8 @@ func (em *EndpointManager) Init(addr string, eventProcessor inf.IProcessor) {
 	em.IHandler.Init(em.IProcessor)
 
 	em.repository = repository.NewRepository()
+
+	return em
 }
 
 func (em *EndpointManager) Start() {
@@ -59,6 +64,7 @@ func (em *EndpointManager) Start() {
 
 func (em *EndpointManager) Stop() {
 	em.stopped = true
+	em.remote.Close()
 }
 
 // updateServiceInfo 更新远程服务信息事件
@@ -72,13 +78,19 @@ func (em *EndpointManager) updateServiceInfo(e inf.IEvent) {
 			log.SysLogger.Errorf("unmarshal pid error: %v", err)
 			return
 		}
-		if pid.GetAddress() == em.remote.GetAddress() {
+		if pid.GetNodeUid() == em.remote.GetNodeUid() {
 			log.SysLogger.Debugf("local service: %s, pid: %+v", pid.String(), &pid)
 			// 本地服务,忽略
 			return
 		}
 
-		em.repository.Add(client.NewRemoteClient(&pid))
+		senderCreator := client.NewSender(pid.GetRpcType())
+		if senderCreator == nil {
+			log.SysLogger.Errorf("create sender error: %s", pid.String())
+			return
+		}
+
+		em.repository.Add(senderCreator(&pid, nil))
 	}
 }
 
@@ -98,10 +110,16 @@ func (em *EndpointManager) removeServiceInfo(e inf.IEvent) {
 }
 
 // AddService 添加本地服务到服务发现中
-func (em *EndpointManager) AddService(serverId int32, serviceId, serviceType, serviceName string, version int64, rpcHandler inf.IRpcHandler) *actor.PID {
-	pid := actor.NewPID(em.remote.GetAddress(), serverId, serviceId, serviceType, serviceName, version)
+func (em *EndpointManager) AddService(serverId int32, serviceId, serviceType, serviceName string, version int64, rpcType string, rpcHandler inf.IRpcHandler) *actor.PID {
+	pid := actor.NewPID(em.remote.GetAddress(), serverId, serviceId, serviceType, serviceName, version, rpcType)
 	log.SysLogger.Debugf("add local service: %s, pid: %v", pid.String(), rpcHandler)
-	em.repository.Add(client.NewLClient(pid, rpcHandler))
+	senderCreator := client.NewSender(def.DefaultRpcTypeLocal)
+	if senderCreator == nil {
+		log.SysLogger.Errorf("create sender error: %s", pid.String())
+		return nil
+	}
+
+	em.repository.Add(senderCreator(pid, rpcHandler))
 
 	// 私有服务不发布到etcd
 	if rpcHandler.IsPrivate() {
