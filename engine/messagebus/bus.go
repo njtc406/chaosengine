@@ -53,7 +53,9 @@ func (mb *MessageBus) call(method string, timeout time.Duration, in, out interfa
 	if mb.senderClient == nil || mb.receiverClient == nil {
 		return fmt.Errorf("senderClient or receiver is nil")
 	}
-
+	if mb.err != nil {
+		return mb.err
+	}
 	if out != nil {
 		switch out.(type) {
 		case []interface{}:
@@ -187,6 +189,10 @@ func (mb *MessageBus) AsyncCall(method string, timeout time.Duration, callbacks 
 		return dto.EmptyCancelRpc, fmt.Errorf("senderClient or receiver is nil")
 	}
 
+	if mb.err != nil {
+		return dto.EmptyCancelRpc, mb.err
+	}
+
 	mt := monitor.GetRpcMonitor()
 
 	// 创建请求
@@ -223,7 +229,9 @@ func (mb *MessageBus) Send(method string, in interface{}) error {
 	if mb.receiverClient == nil {
 		return fmt.Errorf("senderClient or receiver is nil")
 	}
-
+	if mb.err != nil {
+		return mb.err
+	}
 	mt := monitor.GetRpcMonitor()
 
 	// 创建请求
@@ -245,7 +253,9 @@ func (mb *MessageBus) Cast(method string, in interface{}) error {
 	if mb.receiverClient == nil {
 		return fmt.Errorf("senderClient or receiver is nil")
 	}
-
+	if mb.err != nil {
+		return mb.err
+	}
 	mt := monitor.GetRpcMonitor()
 
 	// 创建请求

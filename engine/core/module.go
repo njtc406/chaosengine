@@ -32,7 +32,7 @@ type Module struct {
 	root         inf.IModule            // 根模块
 	rootContains map[uint32]inf.IModule // 根模块下所有模块(包括所有的子模块)
 
-	eventHandler inf.IHandler // 事件处理器
+	eventHandler inf.IEventHandler // 事件处理器
 
 	timerDispatcher  *timer.Dispatcher         // 定时器调度器
 	mapActiveTimer   map[timer.ITimer]struct{} // 活跃定时器
@@ -132,11 +132,11 @@ func (m *Module) GetService() inf.IService {
 	return m.GetRoot().(inf.IService)
 }
 
-func (m *Module) GetEventProcessor() inf.IProcessor {
+func (m *Module) GetEventProcessor() inf.IEventProcessor {
 	return m.eventHandler.GetEventProcessor()
 }
 
-func (m *Module) GetEventHandler() inf.IHandler {
+func (m *Module) GetEventHandler() inf.IEventHandler {
 	return m.eventHandler
 }
 

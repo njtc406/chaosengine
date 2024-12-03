@@ -14,35 +14,31 @@ type IEvent interface {
 	GetType() EventType
 }
 
-type IChannel interface {
+type IEventChannel interface {
 	PushEvent(ev IEvent) error
 }
 
-type IProcessor interface {
-	IChannel
+type IEventProcessor interface {
+	IEventChannel
 
-	Init(eventChannel IChannel)
+	Init(eventChannel IEventChannel)
 	EventHandler(ev IEvent)
-	RegEventReceiverFunc(eventType EventType, receiver IHandler, callback EventCallBack)
-	UnRegEventReceiverFun(eventType EventType, receiver IHandler)
+	RegEventReceiverFunc(eventType EventType, receiver IEventHandler, callback EventCallBack)
+	UnRegEventReceiverFun(eventType EventType, receiver IEventHandler)
 
 	CastEvent(event IEvent) //广播事件
-	AddBindEvent(eventType EventType, receiver IHandler, callback EventCallBack)
-	AddListen(eventType EventType, receiver IHandler)
-	RemoveBindEvent(eventType EventType, receiver IHandler)
-	RemoveListen(eventType EventType, receiver IHandler)
+	AddBindEvent(eventType EventType, receiver IEventHandler, callback EventCallBack)
+	AddListen(eventType EventType, receiver IEventHandler)
+	RemoveBindEvent(eventType EventType, receiver IEventHandler)
+	RemoveListen(eventType EventType, receiver IEventHandler)
 }
 
-type IHandler interface {
-	Init(p IProcessor)
-	GetEventProcessor() IProcessor
+type IEventHandler interface {
+	Init(p IEventProcessor)
+	GetEventProcessor() IEventProcessor
 	NotifyEvent(IEvent)
 	Destroy()
 	//注册了事件
-	AddRegInfo(eventType EventType, eventProcessor IProcessor)
-	RemoveRegInfo(eventType EventType, eventProcessor IProcessor)
-}
-
-type IEventChannel interface {
-	PushEvent(ev IEvent) error
+	AddRegInfo(eventType EventType, eventProcessor IEventProcessor)
+	RemoveRegInfo(eventType EventType, eventProcessor IEventProcessor)
 }

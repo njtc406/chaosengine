@@ -90,3 +90,25 @@ func (r *Repository) SelectByServiceType(sender *actor.PID, nodeType, serviceNam
 
 	return list
 }
+
+func (r *Repository) SelectByFilterAndChoice(sender *actor.PID, filter func(pid *actor.PID) bool, choice func(pids []*actor.PID) []*actor.PID) inf.IBus {
+	s := r.SelectByServiceUid(sender.GetServiceUid())
+	var tmpList []*actor.PID
+	r.mapPID.Range(func(key, value any) bool {
+		if filter(value.(inf.IRpcSender).GetPID()) {
+			tmpList = append(tmpList, value.(inf.IRpcSender).GetPID())
+		}
+		return true
+	})
+
+	list := choice(tmpList)
+	var returnList messagebus.MultiBus
+	for _, pid := range list {
+		c := r.SelectByServiceUid(pid.GetServiceUid())
+		if c != nil && !actor.IsRetired(c.GetPID()) {
+			returnList = append(returnList, messagebus.NewMessageBus(s, c, nil))
+		}
+	}
+
+	return returnList
+}

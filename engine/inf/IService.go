@@ -19,7 +19,7 @@ type IService interface {
 	ILifecycle
 	IIdentifiable
 	IServiceHandler
-	IChannel
+	IEventChannel
 	IProfiler
 }
 

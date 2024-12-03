@@ -32,12 +32,14 @@ func SetService(name string, creator func() inf.IService) {
 func Init() {
 	lock.RLock()
 	defer lock.RUnlock()
+
 	for _, initConf := range config.Conf.ServiceConf.StartServices {
 		if creator, ok := serviceMap[initConf.ServiceName]; ok {
 			log.SysLogger.Infof("Init Service: %s", initConf.ServiceName)
 			svc := creator()
 			svc.OnSetup(svc)
 			var cfg interface{}
+			log.SysLogger.Debugf("service[%s] conf: %+v", initConf.ServiceName, config.GetServiceConf(initConf.ServiceName))
 			if serviceConf, ok := config.Conf.ServiceConf.ServicesConfMap[initConf.ServiceName]; ok {
 				cfg = serviceConf.Cfg
 			}
@@ -52,7 +54,9 @@ func Start() {
 	defer lock.RUnlock()
 	for _, svc := range runServices {
 		log.SysLogger.Infof("Start Service: %s", svc.GetName())
-		svc.Start()
+		if err := svc.Start(); err != nil {
+			log.SysLogger.Errorf("Start Service: %s failed, err: %s", svc.GetName(), err)
+		}
 	}
 }
 

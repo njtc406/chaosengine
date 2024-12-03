@@ -29,19 +29,18 @@ ClusterConf:
     Addr: 0.0.0.0:6688
     # 协议
     Protoc: "tcp"
-    # 最大rpc参数长度(默认 2097152=2M)
-    MaxRpcParamLen: 2097152
-    # 压缩参数,消息长度超过该值,将进行压缩(默认 1048576=1M)
-    CompressBytesLen: 1048576
   RemoteType: rpcx
   DiscoveryType: etcd
   RemoteConfPath: ""
   DiscoveryConf:
     Path: /server/service/register
+    # 服务租约有效期(单位秒)
+    TTL: 3
 
 ServiceConf:
   OpenRemote: false
   RemoteConfPath: ""
+  # 如果配置的远程,那么这里获取的文件就是 /server/service/1/config/services
   StartServices:
     # 服务名称
     - ServiceName: DBService
@@ -61,7 +60,9 @@ ServiceConf:
       TimerSize: 100
       MailBoxSize: 1000
       GoroutineNum: 1
-  ServicesConfMap:
+  # 这里不管是远程还是本地,都不需要配置,服务的配置是读取的服务注册时单独定义的文件！如果配置的远程,那么这里获取的文件就是 /server/service/1/config/不带后缀的文件名
+  # ServicesConfMap:
+
 
 # 日志配置
 SystemLogger:

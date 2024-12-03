@@ -6,7 +6,7 @@
 package inf
 
 type IDiscovery interface {
-	Init(eventProcessor IProcessor) error
+	Init(eventProcessor IEventProcessor) error
 	Start()
 	Close()
 }

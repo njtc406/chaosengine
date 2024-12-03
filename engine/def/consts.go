@@ -50,11 +50,6 @@ const (
 )
 
 const (
-	NodeConfTypeLocal = "local"
-	NodeConfTypeEtcd  = "etcd"
-)
-
-const (
 	DefaultPVPath           = "./cache"
 	DefaultPVCPath          = "./data"
 	DefaultLogPath          = "logs"

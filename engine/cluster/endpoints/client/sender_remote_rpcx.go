@@ -21,7 +21,7 @@ import (
 
 // 远程服务的Client
 
-type remoteSender struct {
+type rpcxSender struct {
 	SenderBase
 	rpcClient client.XClient
 }
@@ -42,7 +42,7 @@ func newRemoteClient(pid *actor.PID, _ inf.IRpcHandler) inf.IRpcSender {
 		TimeToDisallow:      time.Minute,
 	})
 
-	remoteClient := &remoteSender{
+	remoteClient := &rpcxSender{
 		rpcClient: rpcClient,
 	}
 	remoteClient.pid = pid
@@ -51,7 +51,7 @@ func newRemoteClient(pid *actor.PID, _ inf.IRpcHandler) inf.IRpcSender {
 	return remoteClient
 }
 
-func (rc *remoteSender) Close() {
+func (rc *rpcxSender) Close() {
 	if rc.rpcClient == nil {
 		return
 	}
@@ -61,7 +61,7 @@ func (rc *remoteSender) Close() {
 	rc.rpcClient = nil
 }
 
-func (rc *remoteSender) send(envelope inf.IEnvelope) error {
+func (rc *rpcxSender) send(envelope inf.IEnvelope) error {
 	defer msgenvelope.ReleaseMsgEnvelope(envelope)
 	if rc.rpcClient == nil {
 		return errdef.RPCHadClosed
@@ -86,17 +86,17 @@ func (rc *remoteSender) send(envelope inf.IEnvelope) error {
 	return nil
 }
 
-func (rc *remoteSender) SendRequest(envelope inf.IEnvelope) error {
+func (rc *rpcxSender) SendRequest(envelope inf.IEnvelope) error {
 	return rc.send(envelope)
 }
 
-func (rc *remoteSender) SendRequestAndRelease(envelope inf.IEnvelope) error {
+func (rc *rpcxSender) SendRequestAndRelease(envelope inf.IEnvelope) error {
 	// 回收envelope
 	defer msgenvelope.ReleaseMsgEnvelope(envelope)
 	return rc.send(envelope)
 }
 
-func (rc *remoteSender) SendResponse(envelope inf.IEnvelope) error {
+func (rc *rpcxSender) SendResponse(envelope inf.IEnvelope) error {
 	// 回收envelope
 	defer msgenvelope.ReleaseMsgEnvelope(envelope)
 	return rc.send(envelope)

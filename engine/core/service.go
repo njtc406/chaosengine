@@ -47,8 +47,8 @@ type Service struct {
 	mailBox      chan inf.IEvent    // 事件队列
 	profiler     *profiler.Profiler // 性能分析
 
-	rpcHandler     rpc.Handler    // rpc处理器
-	eventProcessor inf.IProcessor // 事件管理器
+	rpcHandler     rpc.Handler         // rpc处理器
+	eventProcessor inf.IEventProcessor // 事件管理器
 }
 
 func (s *Service) fixConf(serviceInitConf *config.ServiceInitConf) {
@@ -83,6 +83,9 @@ func (s *Service) fixConf(serviceInitConf *config.ServiceInitConf) {
 }
 
 func (s *Service) Init(svc interface{}, serviceInitConf *config.ServiceInitConf, cfg interface{}) {
+	if !atomic.CompareAndSwapInt32(&s.status, def.SvcStatusUnknown, def.SvcStatusInit) {
+		return
+	}
 	// 整理配置参数
 	s.fixConf(serviceInitConf)
 	log.SysLogger.Debugf("service[%s] init conf: %+v", s.GetName(), serviceInitConf)
@@ -129,7 +132,9 @@ func (s *Service) Start() error {
 	}
 	var waitRun sync.WaitGroup
 
-	s.src.OnStart()
+	if err := s.src.OnStart(); err != nil {
+		return err
+	}
 	for i := int32(0); i < s.goroutineNum; i++ {
 		s.wg.Add(1)
 		waitRun.Add(1)

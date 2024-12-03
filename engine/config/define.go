@@ -23,20 +23,20 @@ type conf struct {
 type NodeConf struct {
 	NodeId           string        `binding:""`         // 节点ID(目前这个没用,节点id是节点启动的时候自动生成的)
 	SystemStatus     string        `binding:"required"` // 系统状态(debug/release)
-	PVCPath          string        `binding:""`         // 数据持久化目录(默认./data)
-	PVPath           string        `binding:""`         // 缓存目录(默认./run)
+	PVCPath          string        `binding:"required"` // 数据持久化目录(默认./data)
+	PVPath           string        `binding:"required"` // 缓存目录(默认./run)
 	ProfilerInterval time.Duration `binding:""`         // 性能分析间隔
-	AntsPoolSize     int           `binding:""`         // 线程池大小
+	AntsPoolSize     int           `binding:"required"` // 线程池大小
 }
 
 type ClusterConf struct {
-	OpenRemote     bool               `binding:""` // 是否开启远程配置(默认使用本地配置)
-	ETCDConf       *ETCDConf          `binding:""` // etcd配置
-	RPCServer      *RPCServer         `binding:""` // rpc服务配置
-	RemoteType     string             `binding:""` // 远程服务类型(默认rpcx)
-	DiscoveryType  string             `binding:""` // 服务发现类型(默认etcd)
-	RemoteConfPath string             `binding:""` // 远程配置路径(开启了远程配置才会使用,且必须配置etcd)
-	DiscoveryConf  *EtcdDiscoveryConf `binding:""` // 服务发现配置(目前先直接配置,后续会支持多种服务发现方式)
+	OpenRemote     bool               `binding:""`         // 是否开启远程配置(默认使用本地配置)
+	ETCDConf       *ETCDConf          `binding:"required"` // etcd配置
+	RPCServer      *RPCServer         `binding:""`         // rpc服务配置
+	RemoteType     string             `binding:""`         // 远程服务类型(默认rpcx)
+	DiscoveryType  string             `binding:""`         // 服务发现类型(默认etcd)
+	RemoteConfPath string             `binding:""`         // 远程配置路径(开启了远程配置才会使用,且必须配置etcd)
+	DiscoveryConf  *EtcdDiscoveryConf `binding:""`         // 服务发现配置(目前先直接配置,后续会支持多种服务发现方式)
 }
 
 type ServiceConf struct {
@@ -54,10 +54,8 @@ type ETCDConf struct {
 }
 
 type RPCServer struct {
-	Addr             string // rpc监听地址
-	Protoc           string // 协议
-	MaxRpcParamLen   int    // 最大rpc参数长度
-	CompressBytesLen int    // 消息超过该值将进行压缩
+	Addr   string // rpc监听地址
+	Protoc string // 协议
 }
 
 type ServiceInitConf struct {
@@ -83,5 +81,5 @@ type ServiceConfig struct {
 
 type EtcdDiscoveryConf struct {
 	Path string
-	TTL  time.Duration
+	TTL  int64
 }

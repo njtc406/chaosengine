@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/njtc406/chaosengine/engine/config/remote"
 	"github.com/njtc406/chaosengine/engine/def"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/njtc406/chaosutil/validate"
@@ -19,6 +20,7 @@ var (
 )
 
 const defaultConfPath = "./configs"
+const startServiceConfName = "services.yaml"
 
 // 配置初始化逻辑:
 // 1. 解析节点基础配置
@@ -27,6 +29,7 @@ const defaultConfPath = "./configs"
 // 4. 节点会根据服务配置启动对应服务
 
 // TODO 监听配置变化
+// TODO 重写监听,viper的远程监听不支持账号密码,不是很友好,而且远程监听配置用的是轮询！！不是用的api,所以需要重写这块东西
 
 func Init(confPath string) {
 	// 解析配置
@@ -58,6 +61,18 @@ func parseNodeConfig(confPath string) {
 	runtimeViper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	runtimeViper.AutomaticEnv()
 
+	if Conf.ServiceConf.OpenRemote {
+		// 从远程读取启动服务配置
+		// 设置viper的远程配置
+		viper.RemoteConfig = &remote.Config{
+			Endpoints: Conf.ClusterConf.ETCDConf.Endpoints,
+			Username:  Conf.ClusterConf.ETCDConf.UserName,
+			Password:  Conf.ClusterConf.ETCDConf.Password,
+		}
+
+		fmt.Println("=============开启远程配置===================")
+	}
+
 	// 解析启动服务(如果本地没有配置,就从远程读取)
 	parseStartService()
 
@@ -71,7 +86,7 @@ func parseNodeConfig(confPath string) {
 		panic(validate.TransError(err, validate.ZH))
 	}
 
-	fmt.Printf("============node config: %+v\n", Conf.ServiceConf.StartServices[1])
+	fmt.Printf("============node config: %+v\n", Conf.ServiceConf.StartServices[0])
 }
 
 // initDir 创建必要的目录
@@ -121,10 +136,8 @@ func setDefaultValues() {
 			Password:    "",
 		},
 		RPCServer: &RPCServer{
-			Addr:             "0.0.0.0:6688",
-			Protoc:           "tcp",
-			MaxRpcParamLen:   1024 * 1024 * 2,
-			CompressBytesLen: 1024 * 1024,
+			Addr:   "0.0.0.0:6688",
+			Protoc: "tcp",
 		},
 		RemoteType:     def.DefaultRpcTypeRpcx,
 		DiscoveryType:  def.DiscoveryConfUseLocal,
@@ -143,7 +156,8 @@ func parseServiceConf(confPath string) {
 		parser.SetConfigType("yaml")
 		if Conf.ServiceConf.OpenRemote {
 			// 使用远程服务配置
-			if err := parser.AddRemoteProvider("etcd3", Conf.ClusterConf.ETCDConf.Endpoints[0], path.Join(Conf.ServiceConf.RemoteConfPath, v.ConfName)); err != nil {
+			fileName := fmt.Sprintf("%s.%s", v.ConfName, v.ConfType)
+			if err := parser.AddRemoteProvider("etcd3", Conf.ClusterConf.ETCDConf.Endpoints[0], path.Join(Conf.ServiceConf.RemoteConfPath, fileName)); err != nil {
 				panic(err)
 			}
 			if err := parser.ReadRemoteConfig(); err != nil {
@@ -172,10 +186,10 @@ func parseServiceConf(confPath string) {
 
 func parseStartService() {
 	if Conf.ServiceConf.OpenRemote {
-		// 从远程读取启动服务配置
 		parser := viper.New()
 		parser.SetConfigType("yaml")
-		err := parser.AddRemoteProvider("etcd3", Conf.ClusterConf.ETCDConf.Endpoints[0], path.Join(Conf.ServiceConf.RemoteConfPath, "services.yaml"))
+		fmt.Printf("从远程读取启动服务配置路径: %s \n", path.Join(Conf.ServiceConf.RemoteConfPath, startServiceConfName))
+		err := parser.AddRemoteProvider("etcd3", Conf.ClusterConf.ETCDConf.Endpoints[0], path.Join(Conf.ServiceConf.RemoteConfPath, startServiceConfName))
 		if err != nil {
 			panic(err)
 		}
@@ -183,7 +197,7 @@ func parseStartService() {
 		if err = parser.ReadRemoteConfig(); err != nil {
 			panic(err)
 		}
-		if err = parser.Unmarshal(&Conf.ServiceConf.StartServices); err != nil {
+		if err = parser.Unmarshal(&Conf.ServiceConf); err != nil {
 			panic(err)
 		}
 	}

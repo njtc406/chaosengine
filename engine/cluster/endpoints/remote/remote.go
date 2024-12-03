@@ -16,6 +16,7 @@ import (
 
 var remoteMap = map[string]inf.IRemoteServer{
 	def.DefaultRpcTypeRpcx: NewRemote(),
+	// TODO 支持grpc
 }
 
 func GetRemote(tp string) inf.IRemoteServer {

@@ -44,3 +44,7 @@ func (h *Handler) SelectByServiceType(serviceType, serviceName string, filters .
 	}
 	return returnList
 }
+
+func (h *Handler) SelectByFilterAndChoice(filter func(pid *actor.PID) bool, choice func(pids []*actor.PID) []*actor.PID) inf.IBus {
+	return endpoints.GetEndpointManager().SelectByFilterAndChoice(h.GetPID(), filter, choice)
+}

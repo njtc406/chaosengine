@@ -7,9 +7,6 @@ package discovery
 
 import (
 	"context"
-	config "github.com/njtc406/chaosengine/engine/config"
-	"github.com/njtc406/chaosengine/engine/dto"
-	"github.com/njtc406/chaosengine/engine/inf"
 	"path"
 	"sync"
 	"sync/atomic"
@@ -17,7 +14,10 @@ import (
 	"unsafe"
 
 	"github.com/njtc406/chaosengine/engine/actor"
+	"github.com/njtc406/chaosengine/engine/config"
+	"github.com/njtc406/chaosengine/engine/dto"
 	"github.com/njtc406/chaosengine/engine/event"
+	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/asynclib"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/njtc406/chaosengine/engine/utils/pool"
@@ -26,7 +26,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-const minWatchTTL = time.Second * 3
+const minWatchTTL = 3
 
 var locker sync.Mutex
 var discoveryMap = map[string]inf.IDiscovery{
@@ -46,10 +46,10 @@ func CreateDiscovery(name string) inf.IDiscovery {
 }
 
 type EtcdDiscovery struct {
-	inf.IProcessor
-	inf.IHandler
+	inf.IEventProcessor
+	inf.IEventHandler
 
-	closed     bool
+	closed     chan struct{}
 	watching   int32
 	client     *clientv3.Client
 	mapWatcher *sync.Map
@@ -60,10 +60,11 @@ func NewDiscovery() *EtcdDiscovery {
 	return &EtcdDiscovery{}
 }
 
-func (d *EtcdDiscovery) Init(eventProcessor inf.IProcessor) (err error) {
-	d.IProcessor = eventProcessor
-	d.IHandler = event.NewHandler()
-	d.IHandler.Init(d.IProcessor)
+func (d *EtcdDiscovery) Init(eventProcessor inf.IEventProcessor) (err error) {
+	d.IEventProcessor = eventProcessor
+	d.IEventHandler = event.NewHandler()
+	d.IEventHandler.Init(d.IEventProcessor)
+	d.closed = make(chan struct{})
 	d.mapWatcher = &sync.Map{}
 
 	if config.Conf.ClusterConf.DiscoveryConf.TTL < minWatchTTL {
@@ -79,12 +80,22 @@ func (d *EtcdDiscovery) conn() (err error) {
 		return
 	}
 
+	var logger *zap.Logger
+	if config.IsDebug() {
+		logger = zap.NewNop()
+	} else {
+		logger, err = zap.NewProduction()
+	}
+	if err != nil {
+		return
+	}
+
 	d.client, err = clientv3.New(clientv3.Config{
 		Endpoints:   config.Conf.ClusterConf.ETCDConf.Endpoints,
 		DialTimeout: config.Conf.ClusterConf.ETCDConf.DialTimeout,
 		Username:    config.Conf.ClusterConf.ETCDConf.UserName,
 		Password:    config.Conf.ClusterConf.ETCDConf.Password,
-		Logger:      zap.NewNop(),
+		Logger:      logger,
 	})
 	if err == nil {
 		log.SysLogger.Info("etcd connect success")
@@ -100,7 +111,7 @@ func (d *EtcdDiscovery) Start() {
 	if !atomic.CompareAndSwapInt32(&d.watching, 0, 1) {
 		return
 	}
-	d.IProcessor.RegEventReceiverFunc(event.SysEventServiceReg, d.IHandler, d.addService)
+	d.IEventProcessor.RegEventReceiverFunc(event.SysEventServiceReg, d.IEventHandler, d.addService)
 	asynclib.Go(d.watcher)
 	tp := time.AfterFunc(time.Second, d.getAll)
 	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&d.t)), unsafe.Pointer(&tp))
@@ -109,7 +120,8 @@ func (d *EtcdDiscovery) Start() {
 func (d *EtcdDiscovery) Close() {
 	if d.client != nil {
 		// 通知所有goroutine和定时器关闭
-		d.closed = true
+		close(d.closed)
+
 		d.closeWatchers()    // 所有本地服务下线
 		_ = d.client.Close() // 关闭连接
 		d.client = nil
@@ -179,8 +191,10 @@ func (d *EtcdDiscovery) watch() {
 
 	changes := d.client.Watch(context.Background(), config.Conf.ClusterConf.DiscoveryConf.Path, clientv3.WithPrefix())
 
-	for !d.closed {
+	for {
 		select {
+		case <-d.closed:
+			return
 		case resp := <-changes:
 			for _, ev := range resp.Events {
 				var ent *event.Event
@@ -210,8 +224,13 @@ func (d *EtcdDiscovery) watch() {
 
 func (d *EtcdDiscovery) startKeepalive(watcher *watcherInfo) {
 	asynclib.Go(func() {
-		for !watcher.closed {
-			d.keepaliveForever(watcher)
+		for {
+			select {
+			case <-d.closed:
+				return
+			default:
+				d.keepaliveForever(watcher) // 会阻塞
+			}
 		}
 	})
 }
@@ -234,24 +253,31 @@ func (d *EtcdDiscovery) keepaliveForever(watcher *watcherInfo) {
 		return
 	}
 
-	for !watcher.closed {
+	for {
 		select {
+		case <-d.closed:
+			return
 		case kaResp, ok := <-kaRespCh:
 			if !ok || kaResp == nil {
 				log.SysLogger.Errorf("etcd keepalive error: %v", kaResp)
 				// 尝试重连
 				return
 			}
-		default:
-			time.Sleep(time.Millisecond * 10)
 		}
 	}
 }
 
 func (d *EtcdDiscovery) addService(ev inf.IEvent) {
-	if d.closed || d.client == nil {
+	if d.client == nil {
 		return
 	}
+
+	select {
+	case <-d.closed:
+		return
+	default:
+	}
+
 	if ent, ok := ev.(*event.Event); ok {
 		if ent.Type == event.SysEventServiceReg {
 			pid := ent.Data.(*actor.PID)
@@ -282,15 +308,23 @@ func (d *EtcdDiscovery) addService(ev inf.IEvent) {
 
 			log.SysLogger.Infof("etcd register service success: %v", pid.String())
 			asynclib.Go(func() {
+				// 启动心跳
 				d.keepaliveForever(watcher)
-			}) // 启动心跳
+			})
 		}
 	}
 }
 func (d *EtcdDiscovery) removeService(ev inf.IEvent) {
-	if d.closed {
+	if d.client == nil {
 		return
 	}
+
+	select {
+	case <-d.closed:
+		return
+	default:
+	}
+
 	if ent, ok := ev.(*event.Event); ok {
 		if ent.Type == event.SysEventServiceDis {
 			pid := ent.Data.(*actor.PID)
@@ -311,7 +345,7 @@ func (d *EtcdDiscovery) removeService(ev inf.IEvent) {
 }
 
 func (d *EtcdDiscovery) newLeaseID() (clientv3.LeaseID, error) {
-	resp, err := d.client.Grant(context.Background(), int64(config.Conf.ClusterConf.DiscoveryConf.TTL))
+	resp, err := d.client.Grant(context.Background(), config.Conf.ClusterConf.DiscoveryConf.TTL)
 	if err != nil {
 		return 0, err
 	}
@@ -354,10 +388,14 @@ func (w *watcherInfo) Reset() {
 }
 
 func (w *watcherInfo) getLeaseID() clientv3.LeaseID {
+	if w.closed {
+		return 0
+	}
 	return (clientv3.LeaseID)(atomic.LoadInt64((*int64)(&w.leaseID)))
 }
 
 func (w *watcherInfo) setLeaseID(leaseID clientv3.LeaseID) {
+
 	atomic.StoreInt64((*int64)(&w.leaseID), (int64)(leaseID))
 }
 
