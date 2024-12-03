@@ -5,7 +5,7 @@
 // @Update  yr  2024/5/16 下午3:32
 package sdk
 
-import "server/login/internal/service/login/inf"
+import "github.com/njtc406/chaosengine/example/login/internal/service/login/inf"
 
 var sdkHandler = map[string]inf.ISdk{}
 

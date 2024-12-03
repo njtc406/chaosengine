@@ -5,7 +5,7 @@
 // 最后更新:  yr  2024/11/16 0016 17:38
 package sdk
 
-import "server/login/internal/data/db"
+import "github.com/njtc406/chaosengine/example/login/internal/data/db"
 
 type Local struct{}
 

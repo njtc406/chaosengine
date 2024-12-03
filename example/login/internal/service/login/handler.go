@@ -10,11 +10,12 @@ import (
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/njtc406/chaosengine/engine/utils/timelib"
+	"github.com/njtc406/chaosengine/example/login/event"
 	"github.com/njtc406/chaosengine/example/login/internal/service/login/sdk"
+	commmsg "github.com/njtc406/chaosengine/example/msg/comm"
+	msg "github.com/njtc406/chaosengine/example/msg/login"
+	"github.com/njtc406/chaosengine/example/utils/tokenlib"
 	"reflect"
-
-	commmsg "server/msg/comm"
-	msg "server/msg/login"
 )
 
 var handlerMap = map[msg.MsgId]func(l *LoginService, ev *event.HttpEvent){

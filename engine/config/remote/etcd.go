@@ -68,6 +68,7 @@ func (c *Config) WatchChannel(rp viper.RemoteProvider) (<-chan *viper.RemoteResp
 				close(rr)
 				return
 			case res := <-ch:
+				fmt.Println("=============================================iiiiiiiiiiiiiiiiii=======================================")
 				for _, event := range res.Events {
 					ev := &viper.RemoteResponse{
 						Value: event.Kv.Value,
@@ -75,6 +76,7 @@ func (c *Config) WatchChannel(rp viper.RemoteProvider) (<-chan *viper.RemoteResp
 					select {
 					case rr <- ev:
 					default:
+						fmt.Println("remote watch channel full")
 						_, ok := <-rr
 						if !ok {
 							// 外层的监听已经关闭,退出当前监听

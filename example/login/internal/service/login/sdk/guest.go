@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/log"
-	"server/login/internal/data/db"
-	"server/login/internal/def"
-	msg "server/msg/login"
+	"github.com/njtc406/chaosengine/example/login/internal/data/db"
+	"github.com/njtc406/chaosengine/example/login/internal/def"
+	msg "github.com/njtc406/chaosengine/example/msg/login"
 )
 
 func init() {

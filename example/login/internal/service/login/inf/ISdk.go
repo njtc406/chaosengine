@@ -7,7 +7,7 @@ package inf
 
 import (
 	sysInf "github.com/njtc406/chaosengine/engine/inf"
-	"server/login/internal/data/db"
+	"github.com/njtc406/chaosengine/example/login/internal/data/db"
 )
 
 type ISdk interface {

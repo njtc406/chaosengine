@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/fsnotify/fsnotify"
 	"github.com/njtc406/chaosengine/engine/config/remote"
 	"github.com/njtc406/chaosengine/engine/def"
 	"github.com/njtc406/chaosengine/engine/utils/log"
@@ -16,6 +17,7 @@ import (
 
 var (
 	runtimeViper = viper.New()
+	clusterViper = viper.New()
 	Conf         = new(conf)
 )
 
@@ -186,18 +188,22 @@ func parseServiceConf(confPath string) {
 
 func parseStartService() {
 	if Conf.ServiceConf.OpenRemote {
-		parser := viper.New()
-		parser.SetConfigType("yaml")
-		fmt.Printf("从远程读取启动服务配置路径: %s \n", path.Join(Conf.ServiceConf.RemoteConfPath, startServiceConfName))
-		err := parser.AddRemoteProvider("etcd3", Conf.ClusterConf.ETCDConf.Endpoints[0], path.Join(Conf.ServiceConf.RemoteConfPath, startServiceConfName))
+		clusterViper.SetConfigType("yaml")
+		err := clusterViper.AddRemoteProvider("etcd3", Conf.ClusterConf.ETCDConf.Endpoints[0], path.Join(Conf.ServiceConf.RemoteConfPath, startServiceConfName))
 		if err != nil {
 			panic(err)
 		}
 
-		if err = parser.ReadRemoteConfig(); err != nil {
+		if err = clusterViper.ReadRemoteConfig(); err != nil {
 			panic(err)
 		}
-		if err = parser.Unmarshal(&Conf.ServiceConf); err != nil {
+		if err = clusterViper.Unmarshal(&Conf.ServiceConf); err != nil {
+			panic(err)
+		}
+		clusterViper.OnConfigChange(func(in fsnotify.Event) {
+			fmt.Println("start service 配置文件变更")
+		})
+		if err := clusterViper.WatchRemoteConfigOnChannel(); err != nil {
 			panic(err)
 		}
 	}

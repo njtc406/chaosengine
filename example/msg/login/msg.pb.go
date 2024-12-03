@@ -7,10 +7,10 @@
 package msg
 
 import (
+	comm "github.com/njtc406/chaosengine/example/msg/comm"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
-	comm "server/msg/comm"
 	sync "sync"
 )
 

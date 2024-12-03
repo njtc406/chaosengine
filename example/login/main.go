@@ -8,11 +8,11 @@ package main
 import (
 	"github.com/njtc406/chaosengine/engine/core/node"
 	_ "github.com/njtc406/chaosengine/engine/sysService/dbservice"
-	_ "github.com/njtc406/chaosengine/example/login/internal/service"
+	_ "github.com/njtc406/chaosengine/example/login/internal/service/login"
 )
 
 var version = "1.0"
-var configPath = "./configs/login"
+var configPath = "./example/configs/node1"
 
 func main() {
 	node.Start(version, configPath)

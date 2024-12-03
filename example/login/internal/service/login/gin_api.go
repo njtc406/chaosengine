@@ -11,12 +11,12 @@ import (
 	sysInf "github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/njtc406/chaosengine/engine/utils/timelib"
-	"server/glob/dto"
-	"server/glob/event"
-	"server/glob/utils/tokenlib"
-	"server/login/internal/def"
-	commmsg "server/msg/comm"
-	msg "server/msg/login"
+	"github.com/njtc406/chaosengine/example/login/event"
+	"github.com/njtc406/chaosengine/example/login/internal/def"
+	"github.com/njtc406/chaosengine/example/login/internal/dto"
+	commmsg "github.com/njtc406/chaosengine/example/msg/comm"
+	msg "github.com/njtc406/chaosengine/example/msg/login"
+	"github.com/njtc406/chaosengine/example/utils/tokenlib"
 )
 
 func (l *LoginService) OnAuth(c *gin.Context) {
