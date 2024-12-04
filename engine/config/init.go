@@ -2,13 +2,11 @@ package config
 
 import (
 	"fmt"
-	"github.com/fsnotify/fsnotify"
 	"github.com/njtc406/chaosengine/engine/config/remote"
 	"github.com/njtc406/chaosengine/engine/def"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/njtc406/chaosutil/validate"
-	"github.com/spf13/viper"
-	_ "github.com/spf13/viper/remote"
+	"github.com/njtc406/viper"
 	"os"
 	"path"
 	"strings"
@@ -31,13 +29,14 @@ const startServiceConfName = "services.yaml"
 // 4. 节点会根据服务配置启动对应服务
 
 // TODO 监听配置变化
-// TODO 重写监听,viper的远程监听不支持账号密码,不是很友好,而且远程监听配置用的是轮询！！不是用的api,所以需要重写这块东西
 
 func Init(confPath string) {
+	fmt.Println("=============开始解析配置===================")
 	// 解析配置
 	parseNodeConfig(confPath)
 	// 初始化目录
 	initDir()
+	fmt.Println("=============配置解析完成===================")
 }
 
 // parseNodeConfig 解析本地配置文件
@@ -72,7 +71,7 @@ func parseNodeConfig(confPath string) {
 			Password:  Conf.ClusterConf.ETCDConf.Password,
 		}
 
-		fmt.Println("=============开启远程配置===================")
+		fmt.Println("=============使用远程配置===================")
 	}
 
 	// 解析启动服务(如果本地没有配置,就从远程读取)
@@ -87,8 +86,6 @@ func parseNodeConfig(confPath string) {
 	if err := validate.Struct(Conf); err != nil {
 		panic(validate.TransError(err, validate.ZH))
 	}
-
-	fmt.Printf("============node config: %+v\n", Conf.ServiceConf.StartServices[0])
 }
 
 // initDir 创建必要的目录
@@ -112,7 +109,7 @@ func setDefaultValues() {
 		SystemStatus:     Debug,
 		PVCPath:          def.DefaultPVCPath,
 		PVPath:           def.DefaultPVPath,
-		ProfilerInterval: def.DefaultProfilerInterval,
+		ProfilerInterval: 0, // 默认不开启
 		AntsPoolSize:     def.DefaultAntsPoolSize,
 	})
 
@@ -130,7 +127,6 @@ func setDefaultValues() {
 
 	// 默认集群配置
 	runtimeViper.SetDefault("ClusterConf", &ClusterConf{
-		OpenRemote: false,
 		ETCDConf: &ETCDConf{
 			Endpoints:   []string{"127.0.0.1:2379"},
 			DialTimeout: 3 * time.Second,
@@ -200,10 +196,14 @@ func parseStartService() {
 		if err = clusterViper.Unmarshal(&Conf.ServiceConf); err != nil {
 			panic(err)
 		}
-		clusterViper.OnConfigChange(func(in fsnotify.Event) {
-			fmt.Println("start service 配置文件变更")
+		clusterViper.OnRemoteConfigChange(func() {
+			if err = clusterViper.Unmarshal(&Conf.ServiceConf); err != nil {
+				fmt.Println("clusterViper unmarshal failed:", err)
+			}
+
+			// TODO 执行配置变更函数
 		})
-		if err := clusterViper.WatchRemoteConfigOnChannel(); err != nil {
+		if err = clusterViper.WatchRemoteConfigOnChannel(); err != nil {
 			panic(err)
 		}
 	}

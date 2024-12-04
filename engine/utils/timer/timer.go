@@ -6,6 +6,7 @@ import (
 	"github.com/njtc406/chaosengine/engine/utils/pool"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 	"sync/atomic"
 	"time"
 )
@@ -116,7 +117,7 @@ func (t *Timer) Do() {
 	defer func() {
 		if r := recover(); r != nil {
 			// 纪录日志
-			log.SysLogger.Error(r)
+			log.SysLogger.Errorf("timer do err: %s\ntrace: %s", r, debug.Stack())
 		}
 	}()
 

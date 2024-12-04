@@ -255,6 +255,9 @@ func (m *Module) GenTimerId() uint64 {
 }
 
 func (m *Module) SafeAfterFunc(timerId *uint64, d time.Duration, AdditionData interface{}, cb func(uint64, interface{})) {
+	if timerId == nil {
+		return
+	}
 	if m.mapActiveIDTimer == nil {
 		m.mapActiveIDTimer = map[uint64]timer.ITimer{}
 	}

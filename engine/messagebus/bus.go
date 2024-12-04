@@ -109,7 +109,9 @@ func (mb *MessageBus) call(method string, timeout time.Duration, in, out interfa
 	envelope.Wait()
 
 	mt.Remove(envelope.GetReqId()) // 容错,不管有没有释放,都释放一次(实际上在所有设置done之前都会释放)
+
 	if err := envelope.GetError(); err != nil {
+		msgenvelope.ReleaseMsgEnvelope(envelope)
 		return err
 	}
 

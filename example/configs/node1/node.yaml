@@ -37,12 +37,12 @@ ClusterConf:
 
 ServiceConf:
   OpenRemote: false
-  RemoteConfPath: "/server/service/1/config"
+  RemoteConfPath: ""
   StartServices:
     # 服务名称
-    - ServiceName: DBService
+    - ServiceName: Service1
       # 服务类型
-      Type: db
+      Type: test
       # 服务器ID
       ServerId: 1
       # 定时器大小
@@ -51,8 +51,8 @@ ServiceConf:
       MailBoxSize: 1000
       # 协程数量
       GoroutineNum: 1
-    - ServiceName: LoginService
-      Type: login
+    - ServiceName: Service2
+      Type: test
       ServerId: 1
       TimerSize: 100
       MailBoxSize: 1000

@@ -70,8 +70,6 @@ func (rc *rpcxSender) send(envelope inf.IEnvelope) error {
 	ctx, cancel := context.WithTimeout(context.Background(), envelope.GetTimeout())
 	defer cancel()
 
-	// TODO 如果消息内容太大,需要考虑压缩消息(会有点应影响效率)
-
 	// 构建发送消息
 	msg := envelope.ToProtoMsg()
 	if msg == nil {
@@ -91,13 +89,9 @@ func (rc *rpcxSender) SendRequest(envelope inf.IEnvelope) error {
 }
 
 func (rc *rpcxSender) SendRequestAndRelease(envelope inf.IEnvelope) error {
-	// 回收envelope
-	defer msgenvelope.ReleaseMsgEnvelope(envelope)
 	return rc.send(envelope)
 }
 
 func (rc *rpcxSender) SendResponse(envelope inf.IEnvelope) error {
-	// 回收envelope
-	defer msgenvelope.ReleaseMsgEnvelope(envelope)
 	return rc.send(envelope)
 }

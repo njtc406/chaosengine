@@ -10,15 +10,15 @@ var (
 	ModuleNotInitialized    = errors.New("module not initialized")                    // 模块未初始化
 	ModuleHadRegistered     = errors.New("module had registered")                     // 已经注册过该模块
 	EventChannelIsFull      = errors.New("event channel is full")                     // 事件通道已满
-	RPCCallTimeout          = errors.New("RPC call timeout")                          // RPC 调用超时
+	RPCCallTimeout          = errors.New("rpc call timeout")                          // RPC 调用超时
 	ServiceNotFound         = errors.New("service not found")                         // 服务未找到
 	ServiceIsRunning        = errors.New("service is running")                        // 服务正在运行
-	RPCCallFailed           = errors.New("RPC call failed")                           // RPC 调用失败
+	RPCCallFailed           = errors.New("rpc call failed")                           // RPC 调用失败
 	ParamNotMatch           = errors.New("param not match")                           // 参数不匹配
 	InputParamCantUseStruct = errors.New("input param can't use struct, must be ptr") // 输入参数不能使用结构体,必须是结构体指针
 	OutputParamNotMatch     = errors.New("output param not match")                    // 输出参数不匹配
 	MethodNotFound          = errors.New("method not found")                          // 方法未找到
-	RPCHadClosed            = errors.New("RPC had closed")                            // RPC 已经关闭
+	RPCHadClosed            = errors.New("rpc had closed")                            // RPC 已经关闭
 	MsgSerializeFailed      = errors.New("message serialize failed")                  // 消息序列化失败
 	TokenExpired            = errors.New("token expired")                             // token 过期
 	TokenInvalid            = errors.New("token invalid")                             // token 无效
@@ -30,4 +30,5 @@ var (
 	ServiceIsUnavailable    = errors.New("service is unavailable")                    // 服务不可用
 	DiscoveryConfNotFound   = errors.New("discovery conf not found")                  // 配置中心未找到
 	ETCDNotInit             = errors.New("etcd not init")                             // etcd 未初始化
+	HandleMessagePanic      = errors.New("handle message panic")                      // 处理消息时发生 panic
 )

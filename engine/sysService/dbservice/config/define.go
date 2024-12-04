@@ -2,8 +2,8 @@ package config
 
 import (
 	"github.com/njtc406/chaosengine/engine/sysModule/mysqlmodule"
+	"github.com/njtc406/viper"
 	"github.com/redis/go-redis/v9"
-	"github.com/spf13/viper"
 	"time"
 )
 

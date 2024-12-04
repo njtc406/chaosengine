@@ -1,9 +1,0 @@
-# http服务
-
-# 游戏服配置
-LoginServerConf:
-  Addr: 0.0.0.0:90
-  ReadHeaderTimeout: 10s
-  IdleTimeout: 30s
-  #CachePath: http_cache
-  Auth: false

@@ -132,10 +132,14 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.SysLogger.Errorf("service[%s] handle message panic: %v\n trace:%s", h.GetName(), r, debug.Stack())
+			envelope.SetResponse(nil)
+			envelope.SetError(errdef.HandleMessagePanic)
 		}
+
+		h.doResponse(envelope)
 	}()
 
-	log.SysLogger.Debugf("rpc request handler -> begin handle message: %+v", envelope)
+	//log.SysLogger.Debugf("rpc request handler -> begin handle message: %+v", envelope)
 
 	var (
 		params  []reflect.Value
@@ -145,7 +149,7 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 	methodInfo, ok := h.methodMap[envelope.GetMethod()]
 	if !ok {
 		envelope.SetError(errdef.MethodNotFound)
-		goto DoResponse
+		return
 	}
 
 	params = append(params, reflect.ValueOf(h.GetRpcHandler()))
@@ -167,12 +171,12 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 		// 这里应该不会触发,因为参数检查的时候已经做过了
 		log.SysLogger.Errorf("method[%s] return value count not match", envelope.GetMethod())
 		envelope.SetError(errdef.OutputParamNotMatch)
-		goto DoResponse
+		return
 	}
 
 	if len(results) == 0 {
 		// 没有返回值
-		goto DoResponse
+		return
 	}
 
 	// 解析返回
@@ -186,8 +190,9 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 			t.Kind() == reflect.Chan {
 			if t.Implements(reflect.TypeOf((*error)(nil)).Elem()) {
 				if err, ok := result.Interface().(error); ok && err != nil {
+					// 只要返回了错误,其他数据都不再接收
 					envelope.SetError(err)
-					goto DoResponse
+					return
 				} else {
 					continue
 				}
@@ -206,12 +211,7 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 				}
 			}
 		} else {
-			var res interface{}
-			if result.IsNil() {
-				res = nil
-			} else {
-				res = result.Interface()
-			}
+			res := result.Interface()
 
 			if methodInfo.MultiOut {
 				resp = append(resp, res)
@@ -225,10 +225,14 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 		// 兼容多返回参数
 		envelope.SetResponse(resp)
 	}
+}
 
-DoResponse:
+func (h *Handler) doResponse(envelope inf.IEnvelope) {
+	if !envelope.IsRef() {
+		// 已经被释放,丢弃
+		return
+	}
 	if envelope.NeedResponse() {
-		log.SysLogger.Debugf("============>>>>>>>>>>>>1111111111111111111111111")
 		// 需要回复
 		envelope.SetReply()      // 这是回复
 		envelope.SetRequest(nil) // 清除请求数据
@@ -239,7 +243,6 @@ DoResponse:
 			msgenvelope.ReleaseMsgEnvelope(envelope)
 		}
 	} else {
-		log.SysLogger.Debugf("============>>>>>>>>>>>>22222222222222222222222222")
 		// 不需要回复,释放资源
 		msgenvelope.ReleaseMsgEnvelope(envelope)
 	}

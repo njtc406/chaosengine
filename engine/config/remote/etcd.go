@@ -13,7 +13,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/spf13/viper"
+	"github.com/njtc406/viper"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
@@ -68,7 +68,6 @@ func (c *Config) WatchChannel(rp viper.RemoteProvider) (<-chan *viper.RemoteResp
 				close(rr)
 				return
 			case res := <-ch:
-				fmt.Println("=============================================iiiiiiiiiiiiiiiiii=======================================")
 				for _, event := range res.Events {
 					ev := &viper.RemoteResponse{
 						Value: event.Kv.Value,
@@ -76,7 +75,6 @@ func (c *Config) WatchChannel(rp viper.RemoteProvider) (<-chan *viper.RemoteResp
 					select {
 					case rr <- ev:
 					default:
-						fmt.Println("remote watch channel full")
 						_, ok := <-rr
 						if !ok {
 							// 外层的监听已经关闭,退出当前监听
@@ -93,15 +91,15 @@ func (c *Config) WatchChannel(rp viper.RemoteProvider) (<-chan *viper.RemoteResp
 }
 
 func (c *Config) newClient() (*clientv3.Client, error) {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		return nil, err
-	}
+	//logger, err := zap.NewDevelopment()
+	//if err != nil {
+	//	return nil, err
+	//}
 	client, err := clientv3.New(clientv3.Config{
 		Endpoints: c.Endpoints,
 		Username:  c.Username,
 		Password:  c.Password,
-		Logger:    logger,
+		Logger:    zap.NewNop(),
 	})
 
 	if err != nil {
@@ -113,7 +111,6 @@ func (c *Config) newClient() (*clientv3.Client, error) {
 
 func (c *Config) get() (io.Reader, error) {
 	if c.client == nil {
-		fmt.Println("===========new etcd client")
 		client, err := c.newClient()
 
 		if err != nil {
@@ -130,8 +127,6 @@ func (c *Config) get() (io.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println("get remote config success")
 
 	if len(resp.Kvs) == 0 {
 		return bytes.NewReader([]byte{}), nil

@@ -2,7 +2,7 @@ package config
 
 import (
 	"github.com/njtc406/chaosengine/engine/utils/log"
-	"github.com/spf13/viper"
+	"github.com/njtc406/viper"
 	"time"
 )
 
@@ -25,12 +25,11 @@ type NodeConf struct {
 	SystemStatus     string        `binding:"required"` // 系统状态(debug/release)
 	PVCPath          string        `binding:"required"` // 数据持久化目录(默认./data)
 	PVPath           string        `binding:"required"` // 缓存目录(默认./run)
-	ProfilerInterval time.Duration `binding:""`         // 性能分析间隔
+	ProfilerInterval time.Duration `binding:""`         // 性能分析间隔(默认0,不开启)
 	AntsPoolSize     int           `binding:"required"` // 线程池大小
 }
 
 type ClusterConf struct {
-	OpenRemote     bool               `binding:""`         // 是否开启远程配置(默认使用本地配置)
 	ETCDConf       *ETCDConf          `binding:"required"` // etcd配置
 	RPCServer      *RPCServer         `binding:""`         // rpc服务配置
 	RemoteType     string             `binding:""`         // 远程服务类型(默认rpcx)

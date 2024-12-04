@@ -108,6 +108,7 @@ func (s *Service) Init(svc interface{}, serviceInitConf *config.ServiceInitConf,
 
 	// rpc处理器
 	s.rpcHandler.Init(svc.(inf.IRpcHandler))
+	s.IRpcHandler = &s.rpcHandler
 
 	// 初始化根模块
 	s.self = svc.(inf.IModule)
@@ -188,19 +189,16 @@ func (s *Service) run() {
 					break
 				}
 				c := cEvent.Data.(inf.IEnvelope)
-				log.SysLogger.Debugf("dddddddddddddddddddddddddd")
 				if c.IsReply() {
 					if s.profiler != nil {
 						analyzer = s.profiler.Push(fmt.Sprintf("[RPCResponse]%s", c.GetMethod()))
 					}
-					log.SysLogger.Debugf("eeeeeeeeeeeeeeeeeeeeeeeeeeeee")
 					// 回复
 					s.rpcHandler.HandleResponse(c)
 				} else {
 					if s.profiler != nil {
 						analyzer = s.profiler.Push(fmt.Sprintf("[RPCRequest]%s", c.GetMethod()))
 					}
-					log.SysLogger.Debugf("fffffffffffffffffffffffffff")
 					// rpc调用
 					s.rpcHandler.HandleRequest(c)
 				}
@@ -283,7 +281,6 @@ func (s *Service) PushEvent(e inf.IEvent) error {
 }
 
 func (s *Service) PushRequest(c inf.IEnvelope) error {
-	log.SysLogger.Debugf("bbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 	ev := event.NewEvent()
 	ev.Type = event.SysEventRpc
 	ev.Data = c
