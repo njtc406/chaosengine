@@ -15,7 +15,7 @@ type IRpcHandler interface {
 	IRpcSelector
 
 	GetName() string
-	GetPID() *actor.PID           // 获取服务id
+	GetPid() *actor.PID           // 获取服务id
 	GetRpcHandler() IRpcHandler   // 获取rpc服务
 	HandleRequest(msg IEnvelope)  // 处理请求
 	HandleResponse(msg IEnvelope) // 处理回复

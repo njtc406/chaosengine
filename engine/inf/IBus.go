@@ -20,4 +20,6 @@ type IBus interface {
 	AsyncCall(method string, timeout time.Duration, in interface{}, callbacks ...dto.CompletionFunc) (dto.CancelRpc, error)
 	// Send 无返回调用
 	Send(method string, in interface{}) error
+	// Cast 广播
+	Cast(method string, in interface{})
 }

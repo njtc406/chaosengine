@@ -47,7 +47,7 @@ type IIdentifiable interface {
 	GetName() string
 	SetServiceId(id string)
 	GetServiceId() string
-	GetPID() *actor.PID
+	GetPid() *actor.PID
 	GetServerId() int32
 	IsClosed() bool // 服务是否已经关闭
 }

@@ -262,7 +262,7 @@ func (s *Service) release() {
 	s.closeProfiler()
 
 	// 服务关闭,从服务移除(等待其他释放完再移除,防止在释放的时候有同步调用,例如db等,会导致调用失败)
-	endpoints.GetEndpointManager().RemoveService(s.GetPID())
+	endpoints.GetEndpointManager().RemoveService(s.GetPid())
 }
 
 func (s *Service) pushEvent(e inf.IEvent) error {
@@ -314,7 +314,7 @@ func (s *Service) GetServerId() int32 {
 	return s.serverId
 }
 
-func (s *Service) GetPID() *actor.PID {
+func (s *Service) GetPid() *actor.PID {
 	return s.pid
 }
 

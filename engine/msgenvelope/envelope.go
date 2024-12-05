@@ -22,20 +22,20 @@ type MsgEnvelope struct {
 	// 可能会在多线程环境下面被操作,所以需要锁!
 	locker *sync.RWMutex
 
-	sender       *actor.PID           // 发送者
-	receiver     *actor.PID           // 接收者
-	senderClient inf.IRpcSender       // 发送者客户端(用于回调)
-	method       string               // 调用方法
-	reqID        uint64               // 请求ID(防止重复,目前还未做防重复逻辑)
-	reply        bool                 // 是否是回复
-	header       dto.Header           // 消息头
-	timeout      time.Duration        // 请求超时时间
-	request      interface{}          // 请求参数
-	response     interface{}          // 回复数据
-	needResp     bool                 // 是否需要回复
-	err          error                // 错误
-	callbacks    []dto.CompletionFunc // 完成回调
-	done         chan struct{}        // 完成信号
+	senderPid   *actor.PID           // 发送者
+	receiverPid *actor.PID           // 接收者
+	sender      inf.IRpcSender       // 发送者客户端(用于回调)
+	method      string               // 调用方法
+	reqID       uint64               // 请求ID(防止重复,目前还未做防重复逻辑)
+	reply       bool                 // 是否是回复
+	header      dto.Header           // 消息头
+	timeout     time.Duration        // 请求超时时间
+	request     interface{}          // 请求参数
+	response    interface{}          // 回复数据
+	needResp    bool                 // 是否需要回复
+	err         error                // 错误
+	callbacks   []dto.CompletionFunc // 完成回调
+	done        chan struct{}        // 完成信号
 }
 
 func (e *MsgEnvelope) Reset() {
@@ -46,9 +46,9 @@ func (e *MsgEnvelope) Reset() {
 		e.locker = &sync.RWMutex{}
 	}
 
+	e.senderPid = nil
+	e.receiverPid = nil
 	e.sender = nil
-	e.receiver = nil
-	e.senderClient = nil
 	e.method = ""
 	e.reqID = 0
 	e.reply = false
@@ -81,22 +81,22 @@ func (e *MsgEnvelope) SetHeader(key string, value string) {
 	e.header.Set(key, value)
 }
 
-func (e *MsgEnvelope) SetSender(sender *actor.PID) {
+func (e *MsgEnvelope) SetSenderPid(sender *actor.PID) {
 	e.locker.Lock()
 	defer e.locker.Unlock()
-	e.sender = sender
+	e.senderPid = sender
 }
 
-func (e *MsgEnvelope) SetReceiver(receiver *actor.PID) {
+func (e *MsgEnvelope) SetReceiverPid(receiver *actor.PID) {
 	e.locker.Lock()
 	defer e.locker.Unlock()
-	e.receiver = receiver
+	e.receiverPid = receiver
 }
 
-func (e *MsgEnvelope) SetSenderClient(client inf.IRpcSender) {
+func (e *MsgEnvelope) SetSender(client inf.IRpcSender) {
 	e.locker.Lock()
 	defer e.locker.Unlock()
-	e.senderClient = client
+	e.sender = client
 }
 
 func (e *MsgEnvelope) SetMethod(method string) {
@@ -174,22 +174,22 @@ func (e *MsgEnvelope) GetHeaders() dto.Header {
 	return e.header
 }
 
-func (e *MsgEnvelope) GetSender() *actor.PID {
+func (e *MsgEnvelope) GetSenderPid() *actor.PID {
+	e.locker.RLock()
+	defer e.locker.RUnlock()
+	return e.senderPid
+}
+
+func (e *MsgEnvelope) GetReceiverPid() *actor.PID {
+	e.locker.RLock()
+	defer e.locker.RUnlock()
+	return e.receiverPid
+}
+
+func (e *MsgEnvelope) GetSender() inf.IRpcSender {
 	e.locker.RLock()
 	defer e.locker.RUnlock()
 	return e.sender
-}
-
-func (e *MsgEnvelope) GetReceiver() *actor.PID {
-	e.locker.RLock()
-	defer e.locker.RUnlock()
-	return e.receiver
-}
-
-func (e *MsgEnvelope) GetSenderClient() inf.IRpcSender {
-	e.locker.RLock()
-	defer e.locker.RUnlock()
-	return e.senderClient
 }
 
 func (e *MsgEnvelope) GetMethod() string {
@@ -279,8 +279,8 @@ func (e *MsgEnvelope) ToProtoMsg() *actor.Message {
 	msg := &actor.Message{
 		TypeId:        0, // 默认使用protobuf(后面有其他需求再修改这里)
 		TypeName:      "",
-		Sender:        e.sender,
-		Receiver:      e.receiver,
+		SenderPid:     e.senderPid,
+		ReceiverPid:   e.receiverPid,
 		Method:        e.method,
 		Request:       nil,
 		Response:      nil,

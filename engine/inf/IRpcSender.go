@@ -11,6 +11,12 @@ import "github.com/njtc406/chaosengine/engine/actor"
 
 type IRpcSender interface {
 	IRpcHandler
+	IRpcSenderHandler
+
+	GetPid() *actor.PID
+}
+
+type IRpcSenderHandler interface {
 	Close()
 	// SendRequest 发送请求消息
 	SendRequest(envelope IEnvelope) error
@@ -19,5 +25,5 @@ type IRpcSender interface {
 }
 
 type IRpcSenderFactory interface {
-	GetClient(pid *actor.PID) IRpcSender
+	GetSender(pid *actor.PID) IRpcSender
 }

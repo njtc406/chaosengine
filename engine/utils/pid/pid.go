@@ -15,15 +15,15 @@ import (
 
 // RecordPID 记录pid
 func RecordPID(cachePath string, nodeID int32, nodeType string) {
-	os.WriteFile(path.Join(cachePath, fmt.Sprintf("%s_%d", nodeType, nodeID)+".pid"), ([]byte)(strconv.Itoa(GetPID())), 0644)
+	_ = os.WriteFile(path.Join(cachePath, fmt.Sprintf("%s_%d", nodeType, nodeID)+".pid"), ([]byte)(strconv.Itoa(GetPid())), 0644)
 }
 
 // DeletePID 删除pid
 func DeletePID(cachePath string, nodeID int32, nodeType string) {
-	os.Remove(path.Join(cachePath, fmt.Sprintf("%s_%d", nodeType, nodeID)+".pid"))
+	_ = os.Remove(path.Join(cachePath, fmt.Sprintf("%s_%d", nodeType, nodeID)+".pid"))
 }
 
-// GetPID 获取pid
-func GetPID() int {
+// GetPid 获取pid
+func GetPid() int {
 	return syscall.Getpid()
 }

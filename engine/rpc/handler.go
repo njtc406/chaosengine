@@ -149,7 +149,7 @@ func (h *Handler) suitableMethods(method reflect.Method) error {
 func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.SysLogger.Errorf("service[%s] handle message panic: %v\n trace:%s", h.GetName(), r, debug.Stack())
+			log.SysLogger.Errorf("service[%s] handle message from caller: %s panic: %v\n trace:%s", h.GetName(), envelope.GetSenderPid().String(), r, debug.Stack())
 			envelope.SetResponse(nil)
 			envelope.SetError(errdef.HandleMessagePanic)
 		}
@@ -269,7 +269,7 @@ func (h *Handler) doResponse(envelope inf.IEnvelope) {
 		envelope.SetRequest(nil) // 清除请求数据
 
 		// 发送回复信息
-		if err := envelope.GetSenderClient().SendResponse(envelope); err != nil {
+		if err := envelope.GetSender().SendResponse(envelope); err != nil {
 			log.SysLogger.Errorf("service[%s] send response failed: %v", h.GetName(), err)
 		}
 	} else {
@@ -296,8 +296,8 @@ func (h *Handler) GetName() string {
 	return h.IRpcHandler.GetName()
 }
 
-func (h *Handler) GetPID() *actor.PID {
-	return h.IRpcHandler.GetPID()
+func (h *Handler) GetPid() *actor.PID {
+	return h.IRpcHandler.GetPid()
 }
 
 func (h *Handler) GetRpcHandler() inf.IRpcHandler {

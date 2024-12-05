@@ -54,6 +54,9 @@ func Start(v string, confPath string) {
 	// 初始化等待队列,并启动监听
 	monitor.GetRpcMonitor().Init().Start()
 
+	// TODO 考虑把一些公共的组件都使用service去做, 这样就可以不用去考虑并发的一些问题
+	// 比如cluster里面的一些组件
+
 	// 初始化集群设置
 	cluster.GetCluster().Init()
 	// 启动集群管理器

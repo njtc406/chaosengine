@@ -13,7 +13,6 @@ import (
 	"github.com/smallnest/rpcx/share"
 	"time"
 
-	"github.com/njtc406/chaosengine/engine/actor"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/smallnest/rpcx/client"
@@ -22,11 +21,12 @@ import (
 // 远程服务的Client
 
 type rpcxSender struct {
-	SenderBase
+	inf.IRpcSender
 	rpcClient client.XClient
 }
 
-func newRemoteClient(pid *actor.PID, _ inf.IRpcHandler) inf.IRpcSender {
+func newRemoteClient(sender inf.IRpcSender) inf.IRpcSenderHandler {
+	pid := sender.GetPid()
 	d, _ := client.NewPeer2PeerDiscovery("tcp@"+pid.GetAddress(), "")
 	// 如果调用失败,会自动重试3次
 	rpcClient := client.NewXClient("RpcListener", client.Failtry, client.RandomSelect, d, client.Option{
@@ -43,9 +43,9 @@ func newRemoteClient(pid *actor.PID, _ inf.IRpcHandler) inf.IRpcSender {
 	})
 
 	remoteClient := &rpcxSender{
-		rpcClient: rpcClient,
+		IRpcSender: sender,
+		rpcClient:  rpcClient,
 	}
-	remoteClient.pid = pid
 
 	log.SysLogger.Infof("create remote client success : %s", pid.String())
 	return remoteClient
@@ -76,7 +76,7 @@ func (rc *rpcxSender) send(envelope inf.IEnvelope) error {
 	}
 
 	if _, err := rc.rpcClient.Go(ctx, "RPCCall", msg, nil, nil); err != nil {
-		log.SysLogger.Errorf("send message[%+v] to %s is error: %s", envelope, rc.GetPID().GetServiceUid(), err)
+		log.SysLogger.Errorf("send message[%+v] to %s is error: %s", envelope, rc.IRpcSender.GetPid().GetServiceUid(), err)
 		return errdef.RPCCallFailed
 	}
 

@@ -6,7 +6,6 @@
 package client
 
 import (
-	"github.com/njtc406/chaosengine/engine/actor"
 	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/monitor"
@@ -14,14 +13,13 @@ import (
 
 // localSender 本地服务的Client
 type localSender struct {
-	SenderBase
+	inf.IRpcSender
 }
 
-func newLClient(pid *actor.PID, handler inf.IRpcHandler) inf.IRpcSender {
-	lClient := &localSender{}
-	lClient.pid = pid
-	lClient.IRpcHandler = handler
-	return lClient
+func newLClient(sender inf.IRpcSender) inf.IRpcSenderHandler {
+	return &localSender{
+		IRpcSender: sender,
+	}
 }
 
 func (lc *localSender) Close() {}

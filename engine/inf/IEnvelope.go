@@ -17,9 +17,9 @@ type IEnvelope interface {
 
 	SetHeaders(header dto.Header)
 	SetHeader(key string, value string)
-	SetSender(sender *actor.PID)
-	SetReceiver(receiver *actor.PID)
-	SetSenderClient(client IRpcSender)
+	SetSenderPid(sender *actor.PID)
+	SetReceiverPid(receiver *actor.PID)
+	SetSender(client IRpcSender)
 	SetMethod(method string)
 	SetReqId(reqId uint64)
 	SetReply()
@@ -35,9 +35,9 @@ type IEnvelope interface {
 
 	GetHeader(key string) string
 	GetHeaders() dto.Header
-	GetSender() *actor.PID
-	GetReceiver() *actor.PID
-	GetSenderClient() IRpcSender
+	GetSenderPid() *actor.PID
+	GetReceiverPid() *actor.PID
+	GetSender() IRpcSender
 	GetMethod() string
 	GetReqId() uint64
 	GetRequest() interface{}

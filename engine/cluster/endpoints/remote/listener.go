@@ -32,10 +32,10 @@ func (rm *RPCListener) RPCCall(_ context.Context, req *actor.Message, _ *dto.RPC
 	log.SysLogger.Debugf("rpc call: %+v", req)
 	if req.Reply {
 		// 回复
-		// 需要回复的信息都会加入monitor中,找到对应的信封
+		// 需要回复的信息都会加入monitor中,找到对应的信封数据
 		if envelope := monitor.GetRpcMonitor().Remove(req.ReqId); envelope != nil {
 			// 异步回调,直接发送到对应服务处理,服务处理完后会自己释放envelope
-			sender := envelope.GetSenderClient()
+			sender := envelope.GetSender()
 			if sender != nil && sender.IsClosed() {
 				// 调用者已经下线,丢弃回复
 				msgenvelope.ReleaseMsgEnvelope(envelope)
@@ -78,17 +78,17 @@ func (rm *RPCListener) RPCCall(_ context.Context, req *actor.Message, _ *dto.RPC
 		envelope := msgenvelope.NewMsgEnvelope()
 		envelope.SetHeaders(req.MessageHeader)
 		envelope.SetMethod(req.Method)
-		envelope.SetReceiver(req.Receiver)
+		envelope.SetReceiverPid(req.ReceiverPid)
 		if req.NeedResp {
 			// 需要回复的才设置sender
-			envelope.SetSender(req.Sender)
-			envelope.SetSenderClient(rm.cliFactory.GetClient(req.Sender))
+			envelope.SetSenderPid(req.SenderPid)
+			envelope.SetSender(rm.cliFactory.GetSender(req.SenderPid))
 		}
 		envelope.SetRequest(request)
 		envelope.SetResponse(nil)
 		envelope.SetReqId(req.ReqId)
 		envelope.SetNeedResponse(req.NeedResp)
 
-		return rm.cliFactory.GetClient(req.Receiver).SendRequest(envelope)
+		return rm.cliFactory.GetSender(req.ReceiverPid).SendRequest(envelope)
 	}
 }

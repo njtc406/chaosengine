@@ -52,6 +52,7 @@ func (em *EndpointManager) Init(eventProcessor inf.IEventProcessor) *EndpointMan
 }
 
 func (em *EndpointManager) Start() {
+	em.repository.Start()
 	// 启动rpc监听服务器
 	if err := em.remote.Serve(); err != nil {
 		log.SysLogger.Fatalf("start rpc server error: %v", err)
@@ -65,6 +66,7 @@ func (em *EndpointManager) Start() {
 func (em *EndpointManager) Stop() {
 	em.stopped = true
 	em.remote.Close()
+	em.repository.Stop()
 }
 
 // updateServiceInfo 更新远程服务信息事件
@@ -85,13 +87,7 @@ func (em *EndpointManager) updateServiceInfo(e inf.IEvent) {
 			return
 		}
 
-		senderCreator := client.NewSender(pid.GetRpcType())
-		if senderCreator == nil {
-			log.SysLogger.Errorf("create sender error: %s", pid.String())
-			return
-		}
-
-		em.repository.Add(senderCreator(&pid, nil))
+		em.repository.Add(client.NewSender(def.DefaultRpcTypeRpcx, &pid, nil))
 	}
 }
 
@@ -114,13 +110,7 @@ func (em *EndpointManager) removeServiceInfo(e inf.IEvent) {
 func (em *EndpointManager) AddService(serverId int32, serviceId, serviceType, serviceName string, version int64, rpcType string, rpcHandler inf.IRpcHandler) *actor.PID {
 	pid := actor.NewPID(em.remote.GetAddress(), em.remote.GetNodeUid(), serverId, serviceId, serviceType, serviceName, version, rpcType)
 	log.SysLogger.Debugf("add local service: %s, pid: %v", pid.String(), rpcHandler)
-	senderCreator := client.NewSender(def.DefaultRpcTypeLocal)
-	if senderCreator == nil {
-		log.SysLogger.Errorf("create sender error: %s", pid.String())
-		return nil
-	}
-
-	em.repository.Add(senderCreator(pid, rpcHandler))
+	em.repository.Add(client.NewSender(def.DefaultRpcTypeLocal, pid, rpcHandler))
 
 	// 私有服务不发布到etcd
 	if rpcHandler.IsPrivate() {
@@ -142,12 +132,11 @@ func (em *EndpointManager) RemoveService(pid *actor.PID) {
 	em.repository.Remove(pid)
 }
 
-func (em *EndpointManager) GetClient(pid *actor.PID) inf.IRpcSender {
+func (em *EndpointManager) GetSender(pid *actor.PID) inf.IRpcSender {
 	cli := em.repository.SelectByServiceUid(pid.GetServiceUid())
 	if cli == nil {
-		// 只有一种情况下可能是空的,就是调用者是私有服务,那么此时就单独创建一个
-		// TODO 这里考虑将私有服务的client加入到一个临时列表中,防止每次都创建,然后加入一个过期机制,多久没有调用就删除
-		return client.NewSender(pid.GetRpcType())(pid, nil)
+		// 只有一种情况下可能是空的,就是调用者是私有服务,那么此时就单独创建一个,放入临时仓库
+		return em.repository.AddTmp(client.NewTmpSender(def.DefaultRpcTypeRpcx, pid, nil))
 	}
 	return cli
 }
