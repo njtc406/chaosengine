@@ -1,5 +1,5 @@
 // Package node
-// 模块名: 程序入口
+// 模块名: 节点
 // 功能描述: 用于提供程序入口
 // 作者:  yr  2024/1/10 0010 23:43
 // 最后更新:  yr  2024/1/10 0010 23:43
@@ -7,13 +7,10 @@ package node
 
 import (
 	"github.com/njtc406/chaosengine/engine/cluster"
-	"github.com/njtc406/chaosengine/engine/def"
-	"github.com/njtc406/chaosengine/engine/inf"
+	"github.com/njtc406/chaosengine/engine/config"
 	"github.com/njtc406/chaosengine/engine/monitor"
-	"github.com/njtc406/chaosengine/engine/node/config"
 	"github.com/njtc406/chaosengine/engine/profiler"
 	"github.com/njtc406/chaosengine/engine/services"
-	serviceConf "github.com/njtc406/chaosengine/engine/services/config"
 	"github.com/njtc406/chaosengine/engine/utils/asynclib"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/njtc406/chaosengine/engine/utils/pid"
@@ -26,12 +23,10 @@ import (
 )
 
 var (
-	exitCh           = make(chan os.Signal)
-	ID               int32
-	Type             string
-	baseSetupService []inf.IService
-	preSetupService  []inf.IService
-	hooks            []func()
+	exitCh = make(chan os.Signal)
+	ID     int32
+	Type   string
+	hooks  []func()
 )
 
 func init() {
@@ -51,22 +46,25 @@ func Start(v string, confPath string) {
 	config.Init(confPath)
 
 	// 初始化日志
-	log.Init(config.Conf.GetSystemLoggerFileName(), config.Conf.SystemLogger, config.IsDebug())
+	log.Init(config.Conf.SystemLogger, config.IsDebug())
 
 	// 启动线程池
-	asynclib.InitAntsPool(config.Conf.AntsPoolSize)
+	asynclib.InitAntsPool(config.Conf.NodeConf.AntsPoolSize)
 
 	// 初始化等待队列,并启动监听
 	monitor.GetRpcMonitor().Init().Start()
 
+	// TODO 考虑把一些公共的组件都使用service去做, 这样就可以不用去考虑并发的一些问题
+	// 比如cluster里面的一些组件
+
 	// 初始化集群设置
-	cluster.GetCluster().Init(confPath)
+	cluster.GetCluster().Init()
 	// 启动集群管理器
 	cluster.GetCluster().Start()
 
 	// 记录pid
-	pid.RecordPID(config.Conf.CachePath, ID, Type)
-	defer pid.DeletePID(config.Conf.CachePath, ID, Type)
+	pid.RecordPID(config.Conf.NodeConf.PVPath, ID, Type)
+	defer pid.DeletePID(config.Conf.NodeConf.PVPath, ID, Type)
 
 	// 启动timer
 	timer.StartTimer(10*time.Millisecond, 1000000)
@@ -76,11 +74,8 @@ func Start(v string, confPath string) {
 		f()
 	}
 
-	// 加载服务配置
-	servicesConfig := serviceConf.Init(confPath)
-
-	// 执行节点初始化
-	initNode(servicesConfig)
+	// 初始化服务
+	services.Init()
 
 	// 启动服务
 	services.Start()
@@ -88,8 +83,8 @@ func Start(v string, confPath string) {
 	running := true
 	pProfilerTicker := new(time.Ticker)
 	defer pProfilerTicker.Stop()
-	if config.Conf.ProfilerInterval > 0 {
-		pProfilerTicker = time.NewTicker(config.Conf.ProfilerInterval)
+	if config.Conf.NodeConf.ProfilerInterval > 0 {
+		pProfilerTicker = time.NewTicker(config.Conf.NodeConf.ProfilerInterval)
 	}
 
 	for running {
@@ -107,36 +102,4 @@ func Start(v string, confPath string) {
 	monitor.GetRpcMonitor().Stop()
 	log.SysLogger.Info("server stopped, program exited...")
 	log.Close()
-}
-
-func initNode(serviceConfig map[string]*def.ServiceInitConf) {
-	log.SysLogger.Debugf("serviceConfig: %+v", serviceConfig)
-	// 先加载基础服务
-	for _, s := range baseSetupService {
-		s.Init(s, serviceConfig[s.GetName()], config.GetConf(s.GetName()))
-		services.Setup(s)
-	}
-
-	// 顺序加载服务
-	for _, s := range preSetupService {
-		s.Init(s, serviceConfig[s.GetName()], config.GetConf(s.GetName()))
-		services.Setup(s)
-	}
-
-	services.Init()
-}
-
-func Setup(s ...inf.IService) {
-	for _, sv := range s {
-		sv.OnSetup(sv)
-		preSetupService = append(preSetupService, sv)
-	}
-}
-
-// SetupBase 设置基础服务
-func SetupBase(s ...inf.IService) {
-	for _, sv := range s {
-		sv.OnSetup(sv)
-		baseSetupService = append(baseSetupService, sv)
-	}
 }

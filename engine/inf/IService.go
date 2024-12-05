@@ -7,7 +7,7 @@ package inf
 
 import (
 	"github.com/njtc406/chaosengine/engine/actor"
-	"github.com/njtc406/chaosengine/engine/def"
+	"github.com/njtc406/chaosengine/engine/config"
 	"github.com/njtc406/chaosengine/engine/profiler"
 	"github.com/njtc406/chaosengine/engine/utils/concurrent"
 )
@@ -19,13 +19,13 @@ type IService interface {
 	ILifecycle
 	IIdentifiable
 	IServiceHandler
-	IChannel
+	IEventChannel
 	IProfiler
 }
 
 // ILifecycle 服务生命周期
 type ILifecycle interface {
-	Init(src interface{}, serviceInitConf *def.ServiceInitConf, cfg interface{})
+	Init(src interface{}, serviceInitConf *config.ServiceInitConf, cfg interface{})
 	Start() error
 	Stop()
 	OnInit() error
@@ -47,7 +47,7 @@ type IIdentifiable interface {
 	GetName() string
 	SetServiceId(id string)
 	GetServiceId() string
-	GetPID() *actor.PID
+	GetPid() *actor.PID
 	GetServerId() int32
 	IsClosed() bool // 服务是否已经关闭
 }

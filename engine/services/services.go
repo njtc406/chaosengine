@@ -1,41 +1,50 @@
 // Package services
-// @Title  系统服务
-// @Description  这里放的都是系统级服务
+// @Title  服务管理
+// @Description  所有的服务都需要注册到这里,然后通过配置文件进行启动
 // @Author  yr  2024/7/22 下午2:30
 // @Update  yr  2024/7/22 下午2:30
 package services
 
 import (
+	"github.com/njtc406/chaosengine/engine/config"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"sync"
 )
 
 var (
-	lock           = sync.RWMutex{}
-	mapServiceName map[string]inf.IService
-	list           []inf.IService
+	lock        sync.RWMutex
+	serviceMap  map[string]func() inf.IService // 节点上拥有的服务
+	runServices []inf.IService                 // 运行中的服务
 )
 
 func init() {
-	mapServiceName = make(map[string]inf.IService)
+	serviceMap = make(map[string]func() inf.IService)
 }
 
-// Setup 注册服务
-func Setup(services ...inf.IService) {
-	for _, svc := range services {
-		svc.OnSetup(svc)
-		mapServiceName[svc.GetName()] = svc
-		list = append(list, svc)
-	}
+// SetService 注册服务
+func SetService(name string, creator func() inf.IService) {
+	lock.Lock()
+	serviceMap[name] = creator
+	lock.Unlock()
 }
 
 func Init() {
 	lock.RLock()
 	defer lock.RUnlock()
-	for _, svc := range list {
-		if err := svc.OnInit(); err != nil {
-			log.SysLogger.Panicf("Service %s init error: %v", svc.GetName(), err)
+
+	for _, initConf := range config.Conf.ServiceConf.StartServices {
+		if creator, ok := serviceMap[initConf.ServiceName]; ok {
+			log.SysLogger.Infof("Init Service: %s", initConf.ServiceName)
+			svc := creator()
+			svc.OnSetup(svc)
+			var cfg interface{}
+			log.SysLogger.Debugf("service[%s] conf: %+v", initConf.ServiceName, config.GetServiceConf(initConf.ServiceName))
+			if serviceConf, ok := config.Conf.ServiceConf.ServicesConfMap[initConf.ServiceName]; ok {
+				cfg = serviceConf.Cfg
+			}
+			svc.Init(svc, initConf, cfg)
+			runServices = append(runServices, svc)
 		}
 	}
 }
@@ -43,17 +52,19 @@ func Init() {
 func Start() {
 	lock.RLock()
 	defer lock.RUnlock()
-	for _, svc := range list {
+	for _, svc := range runServices {
 		log.SysLogger.Infof("Start Service: %s", svc.GetName())
-		svc.Start()
+		if err := svc.Start(); err != nil {
+			log.SysLogger.Errorf("Start Service: %s failed, err: %s", svc.GetName(), err)
+		}
 	}
 }
 
 func StopAll() {
 	lock.RLock()
 	defer lock.RUnlock()
-	for i := len(list) - 1; i >= 0; i-- {
-		log.SysLogger.Infof("Stop Service: %s", list[i].GetName())
-		list[i].Stop()
+	for i := len(runServices) - 1; i >= 0; i-- {
+		log.SysLogger.Infof("Stop Service: %s", runServices[i].GetName())
+		runServices[i].Stop()
 	}
 }

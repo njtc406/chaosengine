@@ -7,11 +7,6 @@ package discovery
 
 import (
 	"context"
-	"github.com/njtc406/chaosengine/engine/cluster/config"
-	"github.com/njtc406/chaosengine/engine/dto"
-	"github.com/njtc406/chaosengine/engine/errdef"
-	"github.com/njtc406/chaosengine/engine/inf"
-	nodeConfig "github.com/njtc406/chaosengine/engine/node/config"
 	"path"
 	"sync"
 	"sync/atomic"
@@ -19,7 +14,10 @@ import (
 	"unsafe"
 
 	"github.com/njtc406/chaosengine/engine/actor"
+	"github.com/njtc406/chaosengine/engine/config"
+	"github.com/njtc406/chaosengine/engine/dto"
 	"github.com/njtc406/chaosengine/engine/event"
+	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/asynclib"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/njtc406/chaosengine/engine/utils/pool"
@@ -28,7 +26,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-const minWatchTTL = time.Second * 3
+const minWatchTTL = 3
 
 var locker sync.Mutex
 var discoveryMap = map[string]inf.IDiscovery{
@@ -47,13 +45,15 @@ func CreateDiscovery(name string) inf.IDiscovery {
 	return discoveryMap[name]
 }
 
-type EtcdDiscovery struct {
-	inf.IProcessor
-	inf.IHandler
+// TODO 现在这里有个问题,本地服务注册的时候会触发一次SysEventETCDPut事件,然后保持心跳的时候又会触发一次,导致endpointmgr收到两次
+// TODO 另一个问题就是当有一个服务更新的时候,由于监听的是所有服务,所有服务都会被更新一次
 
-	closed     bool
+type EtcdDiscovery struct {
+	inf.IEventProcessor
+	inf.IEventHandler
+
+	closed     chan struct{}
 	watching   int32
-	conf       *config.EtcdConf
 	client     *clientv3.Client
 	mapWatcher *sync.Map
 	t          *time.Timer
@@ -63,35 +63,42 @@ func NewDiscovery() *EtcdDiscovery {
 	return &EtcdDiscovery{}
 }
 
-func (d *EtcdDiscovery) Init(conf interface{}, eventProcessor inf.IProcessor) (err error) {
-	if conf == nil {
-		return errdef.DiscoveryConfNotFound
-	}
-	d.IProcessor = eventProcessor
-	d.IHandler = event.NewHandler()
-	d.IHandler.Init(d.IProcessor)
-	d.conf = conf.(*config.EtcdConf)
+func (d *EtcdDiscovery) Init(eventProcessor inf.IEventProcessor) (err error) {
+	d.IEventProcessor = eventProcessor
+	d.IEventHandler = event.NewHandler()
+	d.IEventHandler.Init(d.IEventProcessor)
+	d.closed = make(chan struct{})
 	d.mapWatcher = &sync.Map{}
 
-	if d.conf.TTL < minWatchTTL {
-		d.conf.TTL = minWatchTTL
+	if config.Conf.ClusterConf.DiscoveryConf.TTL < minWatchTTL {
+		config.Conf.ClusterConf.DiscoveryConf.TTL = minWatchTTL
 	}
 
 	return d.conn()
 }
 
 func (d *EtcdDiscovery) conn() (err error) {
-	if len(nodeConfig.Conf.ETCDConf.EtcdEndPoints) == 0 {
+	if len(config.Conf.ClusterConf.ETCDConf.Endpoints) == 0 {
 		log.SysLogger.Info("etcd end points is empty")
 		return
 	}
 
+	var logger *zap.Logger
+	if config.IsDebug() {
+		logger = zap.NewNop()
+	} else {
+		logger, err = zap.NewProduction()
+	}
+	if err != nil {
+		return
+	}
+
 	d.client, err = clientv3.New(clientv3.Config{
-		Endpoints:   nodeConfig.Conf.ETCDConf.EtcdEndPoints,
-		DialTimeout: nodeConfig.Conf.ETCDConf.DialTimeout,
-		Username:    nodeConfig.Conf.ETCDConf.UserName,
-		Password:    nodeConfig.Conf.ETCDConf.Password,
-		Logger:      zap.NewNop(),
+		Endpoints:   config.Conf.ClusterConf.ETCDConf.Endpoints,
+		DialTimeout: config.Conf.ClusterConf.ETCDConf.DialTimeout,
+		Username:    config.Conf.ClusterConf.ETCDConf.UserName,
+		Password:    config.Conf.ClusterConf.ETCDConf.Password,
+		Logger:      logger,
 	})
 	if err == nil {
 		log.SysLogger.Info("etcd connect success")
@@ -107,7 +114,7 @@ func (d *EtcdDiscovery) Start() {
 	if !atomic.CompareAndSwapInt32(&d.watching, 0, 1) {
 		return
 	}
-	d.IProcessor.RegEventReceiverFunc(event.SysEventServiceReg, d.IHandler, d.addService)
+	d.IEventProcessor.RegEventReceiverFunc(event.SysEventServiceReg, d.IEventHandler, d.addService)
 	asynclib.Go(d.watcher)
 	tp := time.AfterFunc(time.Second, d.getAll)
 	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&d.t)), unsafe.Pointer(&tp))
@@ -116,7 +123,8 @@ func (d *EtcdDiscovery) Start() {
 func (d *EtcdDiscovery) Close() {
 	if d.client != nil {
 		// 通知所有goroutine和定时器关闭
-		d.closed = true
+		close(d.closed)
+
 		d.closeWatchers()    // 所有本地服务下线
 		_ = d.client.Close() // 关闭连接
 		d.client = nil
@@ -154,7 +162,7 @@ func (d *EtcdDiscovery) getAll() {
 		return
 	}
 	// 获取当前所有服务
-	resp, err := d.client.Get(context.Background(), d.conf.Path, clientv3.WithPrefix())
+	resp, err := d.client.Get(context.Background(), config.Conf.ClusterConf.DiscoveryConf.Path, clientv3.WithPrefix())
 	if err != nil {
 		log.SysLogger.Errorf("etcd get service error: %v", err)
 	} else if len(resp.Kvs) > 0 {
@@ -184,10 +192,12 @@ func (d *EtcdDiscovery) watch() {
 		}
 	}()
 
-	changes := d.client.Watch(context.Background(), d.conf.Path, clientv3.WithPrefix())
+	changes := d.client.Watch(context.Background(), config.Conf.ClusterConf.DiscoveryConf.Path, clientv3.WithPrefix())
 
-	for !d.closed {
+	for {
 		select {
+		case <-d.closed:
+			return
 		case resp := <-changes:
 			for _, ev := range resp.Events {
 				var ent *event.Event
@@ -217,8 +227,13 @@ func (d *EtcdDiscovery) watch() {
 
 func (d *EtcdDiscovery) startKeepalive(watcher *watcherInfo) {
 	asynclib.Go(func() {
-		for !watcher.closed {
-			d.keepaliveForever(watcher)
+		for {
+			select {
+			case <-d.closed:
+				return
+			default:
+				d.keepaliveForever(watcher) // 会阻塞
+			}
 		}
 	})
 }
@@ -241,24 +256,31 @@ func (d *EtcdDiscovery) keepaliveForever(watcher *watcherInfo) {
 		return
 	}
 
-	for !watcher.closed {
+	for {
 		select {
+		case <-d.closed:
+			return
 		case kaResp, ok := <-kaRespCh:
 			if !ok || kaResp == nil {
 				log.SysLogger.Errorf("etcd keepalive error: %v", kaResp)
 				// 尝试重连
 				return
 			}
-		default:
-			time.Sleep(time.Millisecond * 10)
 		}
 	}
 }
 
 func (d *EtcdDiscovery) addService(ev inf.IEvent) {
-	if d.closed || d.client == nil {
+	if d.client == nil {
 		return
 	}
+
+	select {
+	case <-d.closed:
+		return
+	default:
+	}
+
 	if ent, ok := ev.(*event.Event); ok {
 		if ent.Type == event.SysEventServiceReg {
 			pid := ent.Data.(*actor.PID)
@@ -275,7 +297,7 @@ func (d *EtcdDiscovery) addService(ev inf.IEvent) {
 				d.addWatcherInfo(watcher)
 			}
 			// 注册服务
-			fullPath := path.Join(d.conf.Path, pid.GetServiceUid())
+			fullPath := path.Join(config.Conf.ClusterConf.DiscoveryConf.Path, pid.GetServiceUid())
 			log.SysLogger.Debugf("etcd lease id: %d", watcher.getLeaseID())
 			log.SysLogger.Debugf("etcd full path: %s", fullPath)
 			pidByte, err := protojson.Marshal(pid)
@@ -288,23 +310,28 @@ func (d *EtcdDiscovery) addService(ev inf.IEvent) {
 			}
 
 			log.SysLogger.Infof("etcd register service success: %v", pid.String())
-			asynclib.Go(func() {
-				d.keepaliveForever(watcher)
-			}) // 启动心跳
+			d.startKeepalive(watcher)
 		}
 	}
 }
 func (d *EtcdDiscovery) removeService(ev inf.IEvent) {
-	if d.closed {
+	if d.client == nil {
 		return
 	}
+
+	select {
+	case <-d.closed:
+		return
+	default:
+	}
+
 	if ent, ok := ev.(*event.Event); ok {
 		if ent.Type == event.SysEventServiceDis {
 			pid := ent.Data.(*actor.PID)
 			watcher := d.getWatcherInfo(pid)
 			if watcher != nil {
 				// 注销服务
-				_, err := d.client.Delete(context.Background(), path.Join(d.conf.Path, pid.GetServiceUid()))
+				_, err := d.client.Delete(context.Background(), path.Join(config.Conf.ClusterConf.DiscoveryConf.Path, pid.GetServiceUid()))
 				if err != nil {
 					log.SysLogger.Errorf("etcd unregister service error: %v", err)
 				}
@@ -318,7 +345,7 @@ func (d *EtcdDiscovery) removeService(ev inf.IEvent) {
 }
 
 func (d *EtcdDiscovery) newLeaseID() (clientv3.LeaseID, error) {
-	resp, err := d.client.Grant(context.Background(), int64(d.conf.TTL))
+	resp, err := d.client.Grant(context.Background(), config.Conf.ClusterConf.DiscoveryConf.TTL)
 	if err != nil {
 		return 0, err
 	}
@@ -361,10 +388,14 @@ func (w *watcherInfo) Reset() {
 }
 
 func (w *watcherInfo) getLeaseID() clientv3.LeaseID {
+	if w.closed {
+		return 0
+	}
 	return (clientv3.LeaseID)(atomic.LoadInt64((*int64)(&w.leaseID)))
 }
 
 func (w *watcherInfo) setLeaseID(leaseID clientv3.LeaseID) {
+
 	atomic.StoreInt64((*int64)(&w.leaseID), (int64)(leaseID))
 }
 

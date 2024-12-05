@@ -1,7 +1,8 @@
 # 分布式服务框架
 
-这是一个基于 Actor 模型的分布式服务框架，服务之间通过消息进行数据传递。框架特点：
+这是一个基于 Actor 模型的分布式服务框架，服务之间通过消息进行数据传递。
 
+框架特点：
 - 服务默认单线程运行，支持多线程扩展。
 - 结构灵活、模块化，便于开发和维护。
 
@@ -40,7 +41,18 @@
 
 - 节点内和跨节点服务的调用功能。
 - 基于 `etcd` 的服务发现机制。
-- 配置可以远程,可以本地
+- 配置可以远程,可以本地(这个是用来支持k8s的,但是目前还不是很完善)
+---
+
+### 可使用的环境变量
+````
+CHAOS_CONF_PATH = "./configs"                               // 本地配置文件路径(会优先使用环境变量)
+CHAOS_ETCD_CONF_ENDPOINTS = "127.0.0.1:2379,127.0.0.1:2379" // etcd地址
+CHAOS_ETCD_DIAL_TIMEOUT = 5s                                // 连接超时时间
+CHAOS_ETCD_USERNAME = ""                                    // 用户名
+CHAOS_ETCD_PASSWORD = ""                                    // 密码
+CHAOS_ETCD_CONF_BASE_PATH = "/chaos/node/config/node.yaml"  // 配置文件路径
+````
 ---
 
 ## 使用说明
@@ -49,7 +61,7 @@
 
 ```go
 package main
-import "github.com/njtc406/chaosengine/engine/node"
+import "github.com/njtc406/chaosengine/engine/core/node"
 
 var version = "1.0"         // 版本号
 var configPath = "./configs/login" // 配置路径
@@ -69,7 +81,8 @@ func main() {
 package main
 import (
     "github.com/njtc406/chaosengine/engine/core"
-    "github.com/njtc406/chaosengine/engine/node"
+    "github.com/njtc406/chaosengine/engine/core/node"
+    nodeConfig "github.com/njtc406/chaosengine/engine/core/node/config"
 )
 
 func init() {
@@ -139,3 +152,6 @@ func (s *MyService) OnRelease() {
     s.ReleaseAllChildModule()
 }
 ```
+
+## 还未完成的功能:
+1. 远程配置目前只能使用etcd, 后续考虑做成接口方便扩展

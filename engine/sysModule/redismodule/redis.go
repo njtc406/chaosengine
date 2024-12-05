@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/njtc406/chaosengine/engine/core"
+	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/redis/go-redis/v9"
 	"time"
 )
@@ -26,6 +27,7 @@ func NewRedisModule() *RedisModule {
 }
 
 func (rm *RedisModule) Init(conf *redis.Options) {
+	log.SysLogger.Debugf("redis init conf: %+v", conf)
 	rm.client = redis.NewClient(conf)
 }
 

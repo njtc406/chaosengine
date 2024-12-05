@@ -15,7 +15,7 @@ type IRpcHandler interface {
 	IRpcSelector
 
 	GetName() string
-	GetPID() *actor.PID           // 获取服务id
+	GetPid() *actor.PID           // 获取服务id
 	GetRpcHandler() IRpcHandler   // 获取rpc服务
 	HandleRequest(msg IEnvelope)  // 处理请求
 	HandleResponse(msg IEnvelope) // 处理回复
@@ -34,7 +34,9 @@ type IRpcSelector interface {
 	SelectByRule(rule func(pid *actor.PID) bool) IBus
 
 	// SelectByServiceType 根据服务类型选择服务
-	SelectByServiceType(serviceType, serviceName string, filters ...func(pid *actor.PID) bool) IBus
+	SelectByServiceType(serverId int32, serviceType, serviceName string, filters ...func(pid *actor.PID) bool) IBus
+
+	SelectSameServerByServiceType(serviceType, serviceName string, filters ...func(pid *actor.PID) bool) IBus
 }
 
 type IRpcChannel interface {

@@ -1,5 +1,5 @@
 // Package asynclib
-// Mode Name: 异步执行
+// Mode ServiceName: 异步执行
 // Mode Desc: 使用协程池中的协程执行任务,防止出现瞬间创建大量协程,出现性能问题
 package asynclib
 

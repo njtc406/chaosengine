@@ -7,7 +7,7 @@ package config
 
 import (
 	"github.com/njtc406/chaosengine/engine/sysModule/httpmodule"
-	"github.com/spf13/viper"
+	"github.com/njtc406/viper"
 	"time"
 )
 

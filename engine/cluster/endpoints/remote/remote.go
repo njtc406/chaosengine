@@ -7,49 +7,67 @@ package remote
 
 import (
 	"github.com/google/uuid"
+	"github.com/njtc406/chaosengine/engine/config"
+	"github.com/njtc406/chaosengine/engine/def"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/smallnest/rpcx/server"
 )
 
-type Remote struct {
-	address  string // 服务监听地址
+var remoteMap = map[string]inf.IRemoteServer{
+	def.DefaultRpcTypeRpcx: NewRemote(),
+	// TODO 支持grpc
+}
+
+func GetRemote(tp string) inf.IRemoteServer {
+	return remoteMap[tp]
+}
+
+type DefaultRemote struct {
 	nodeUid  string // 节点唯一ID
 	listener inf.IRpcListener
+	conf     *config.RPCServer
 	svr      *server.Server
 }
 
-func NewRemote(address string, listener inf.IRpcListener) *Remote {
-	return &Remote{
-		address:  address,
-		nodeUid:  uuid.NewString(),
-		listener: listener,
-	}
+func NewRemote() *DefaultRemote {
+	return &DefaultRemote{}
 }
 
-func (r *Remote) Init() {
+func (r *DefaultRemote) Init(conf *config.RPCServer, cliFactory inf.IRpcSenderFactory) {
+	r.conf = conf
+	if r.nodeUid == "" {
+		r.nodeUid = uuid.NewString()
+	}
+	r.listener = NewRPCListener(cliFactory)
 	r.svr = server.NewServer()
 }
 
-func (r *Remote) Serve() error {
+func (r *DefaultRemote) Serve() error {
 	// 注册rpc监听服务
-	if err := r.svr.Register(r.listener, ""); err != nil {
+	if err := r.svr.RegisterName("RpcListener", r.listener, ""); err != nil {
 		return err
 	}
 
 	go func() {
-		if err := r.svr.Serve("tcp", r.address); err != nil {
-			log.SysLogger.Errorf("rpc serve stop: %v", err)
+		if err := r.svr.Serve(r.conf.Protoc, r.conf.Addr); err != nil {
+			log.SysLogger.Warnf("rpc serve stop: %v", err)
 		}
 	}()
 
 	return nil
 }
 
-func (r *Remote) GetAddress() string {
-	return r.address
+func (r *DefaultRemote) Close() {
+	if err := r.svr.Close(); err != nil {
+		log.SysLogger.Errorf("rpc server close error: %v", err)
+	}
 }
 
-func (r *Remote) GetNodeUid() string {
+func (r *DefaultRemote) GetAddress() string {
+	return r.conf.Addr
+}
+
+func (r *DefaultRemote) GetNodeUid() string {
 	return r.nodeUid
 }

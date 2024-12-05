@@ -6,7 +6,6 @@
 package monitor
 
 import (
-	"fmt"
 	"github.com/njtc406/chaosengine/engine/dto"
 	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/inf"
@@ -21,7 +20,7 @@ var rpcMonitor *RpcMonitor
 
 type RpcMonitor struct {
 	closed  chan struct{}
-	locker  sync.Mutex
+	locker  sync.RWMutex
 	seed    uint64
 	waitMap map[uint64]inf.IEnvelope
 	th      CallTimerHeap // 由于请求很频繁,所以这里使用单独的timer来处理
@@ -65,7 +64,7 @@ func (rm *RpcMonitor) listen() {
 
 func (rm *RpcMonitor) tick() {
 	for i := 0; i < 1000; i++ { // 每个tick 最多处理1000个超时的rpc
-		rm.locker.Lock() // 放里面,防止tick期间一直占用锁
+		rm.locker.Lock()
 		id := rm.th.PopTimeout()
 		if id == 0 {
 			rm.locker.Unlock()
@@ -73,17 +72,19 @@ func (rm *RpcMonitor) tick() {
 		}
 
 		envelope := rm.waitMap[id]
-		if envelope == nil {
+
+		// 直接删除
+		delete(rm.waitMap, id)
+
+		if envelope == nil || !envelope.IsRef() {
 			rm.locker.Unlock()
 			log.SysLogger.Errorf("call seq is not find,seq:%d", id)
 			continue
 		}
 
-		delete(rm.waitMap, id)
-		//log.SysLogger.Debugf("RPC call takes more than %d seconds,method is %s", int64(f.GetTimeout().Seconds()), f.GetMethod())
-		fmt.Printf("RPC call takes more than %d seconds,method is %s", int64(envelope.GetTimeout().Seconds()), envelope.GetMethod())
+		log.SysLogger.Debugf("RPC call takes more than %d seconds,method is %s", int64(envelope.GetTimeout().Seconds()), envelope.GetMethod())
 		// 调用超时,执行超时回调
-		rm.futureCallTimeout(envelope)
+		rm.callTimeout(envelope)
 		rm.locker.Unlock()
 		continue
 	}
@@ -94,13 +95,12 @@ func (rm *RpcMonitor) GenSeq() uint64 {
 }
 
 func (rm *RpcMonitor) Add(envelope inf.IEnvelope) {
-	rm.locker.Lock()
-	defer rm.locker.Unlock()
-
 	id := envelope.GetReqId()
 	if id == 0 {
 		return
 	}
+	rm.locker.Lock()
+	defer rm.locker.Unlock()
 	rm.waitMap[id] = envelope
 	rm.th.AddTimer(id, envelope.GetTimeout())
 }
@@ -127,15 +127,15 @@ func (rm *RpcMonitor) Remove(id uint64) inf.IEnvelope {
 }
 
 func (rm *RpcMonitor) Get(id uint64) inf.IEnvelope {
-	rm.locker.Lock()
-	defer rm.locker.Unlock()
+	rm.locker.RLock()
+	defer rm.locker.RUnlock()
 
 	return rm.waitMap[id]
 }
 
-func (rm *RpcMonitor) futureCallTimeout(envelope inf.IEnvelope) {
+func (rm *RpcMonitor) callTimeout(envelope inf.IEnvelope) {
 	if !envelope.IsRef() {
-		log.SysLogger.Errorf("future is not ref,pid:%s", envelope.GetSender().String())
+		log.SysLogger.Debug("envelope is not ref")
 		return // 已经被释放,丢弃
 	}
 
@@ -145,7 +145,7 @@ func (rm *RpcMonitor) futureCallTimeout(envelope inf.IEnvelope) {
 	if envelope.NeedCallback() {
 		// (这里的envelope会在两个地方回收,如果是本地调用,那么会在requestHandler执行完成后自动回收
 		// 如果是远程调用,那么在远程client将消息发送完成后自动回收)
-		if err := envelope.GetSenderClient().PushRequest(envelope); err != nil {
+		if err := envelope.GetSender().PushRequest(envelope); err != nil {
 			msgenvelope.ReleaseMsgEnvelope(envelope)
 			log.SysLogger.Errorf("send call timeout response error:%s", err.Error())
 		}

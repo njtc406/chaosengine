@@ -42,10 +42,10 @@ type IModuleHierarchy interface {
 }
 
 type IModuleServiceEvent interface {
-	GetService() IService          // 获取服务
-	GetEventHandler() IHandler     // 获取事件处理器
-	GetEventProcessor() IProcessor // 获取事件管理器
-	NotifyEvent(IEvent)            // 通知事件
+	GetService() IService               // 获取服务
+	GetEventHandler() IEventHandler     // 获取事件处理器
+	GetEventProcessor() IEventProcessor // 获取事件管理器
+	NotifyEvent(IEvent)                 // 通知事件
 }
 
 type IModuleTimer interface {

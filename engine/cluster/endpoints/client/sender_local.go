@@ -6,28 +6,25 @@
 package client
 
 import (
-	"github.com/njtc406/chaosengine/engine/actor"
 	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/monitor"
-	"github.com/njtc406/chaosengine/engine/utils/log"
 )
 
-// LocalSender 本地服务的Client
-type LocalSender struct {
-	SenderBase
+// localSender 本地服务的Client
+type localSender struct {
+	inf.IRpcSender
 }
 
-func NewLClient(pid *actor.PID, handler inf.IRpcHandler) inf.IRpcSender {
-	lClient := &LocalSender{}
-	lClient.pid = pid
-	lClient.IRpcHandler = handler
-	return lClient
+func newLClient(sender inf.IRpcSender) inf.IRpcSenderHandler {
+	return &localSender{
+		IRpcSender: sender,
+	}
 }
 
-func (lc *LocalSender) Close() {}
+func (lc *localSender) Close() {}
 
-func (lc *LocalSender) SendRequest(envelope inf.IEnvelope) error {
+func (lc *localSender) SendRequest(envelope inf.IEnvelope) error {
 	if lc.IsClosed() {
 		return errdef.ServiceNotFound
 	}
@@ -35,7 +32,7 @@ func (lc *LocalSender) SendRequest(envelope inf.IEnvelope) error {
 	return lc.PushRequest(envelope)
 }
 
-func (lc *LocalSender) SendResponse(envelope inf.IEnvelope) error {
+func (lc *localSender) SendResponse(envelope inf.IEnvelope) error {
 	monitor.GetRpcMonitor().Remove(envelope.GetReqId()) // 回复时先移除监控,防止超时
 	if lc.IsClosed() {
 		envelope.SetError(errdef.ServiceNotFound)
@@ -44,18 +41,16 @@ func (lc *LocalSender) SendResponse(envelope inf.IEnvelope) error {
 	}
 
 	if envelope.NeedCallback() {
-		log.SysLogger.Debugf("--------------<<<<<<<<<<<<< response need call back")
 		// 本地调用的回复消息,直接发送到对应service的邮箱处理
 		return lc.PushRequest(envelope)
 	} else {
-		log.SysLogger.Debugf("---------------<<<<<<<<<<<< response not need call back")
 		// 同步调用,直接设置调用结束
 		envelope.Done()
 	}
 	return nil
 }
 
-func (lc *LocalSender) SendRequestAndRelease(envelope inf.IEnvelope) error {
+func (lc *localSender) SendRequestAndRelease(envelope inf.IEnvelope) error {
 	// 本地调用envelope在接收者处理后释放
 	return lc.SendRequest(envelope)
 }

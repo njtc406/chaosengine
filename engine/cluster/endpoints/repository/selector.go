@@ -10,14 +10,26 @@ import (
 	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/messagebus"
+	"github.com/njtc406/chaosengine/engine/utils/timelib"
 )
 
 func (r *Repository) SelectByServiceUid(serviceUid string) inf.IRpcSender {
 	v, ok := r.mapPID.Load(serviceUid)
 	if ok {
-		ep := v.(inf.IRpcSender)
-		if ep != nil && !actor.IsRetired(ep.GetPID()) {
-			return ep
+		sender := v.(inf.IRpcSender)
+		if sender != nil && !actor.IsRetired(sender.GetPid()) {
+			return sender
+		}
+	} else {
+		tmpV, ok := r.tmpMapPid.Load(serviceUid)
+		if ok {
+			tmp := tmpV.(*tmpInfo)
+			tmp.latest = timelib.GetTime()
+			sender := tmp.sender
+			if sender != nil {
+				r.tmpMapPid.Store(serviceUid, tmp)
+				return sender
+			}
 		}
 	}
 	return nil
@@ -26,7 +38,7 @@ func (r *Repository) SelectByServiceUid(serviceUid string) inf.IRpcSender {
 func (r *Repository) SelectByPid(sender, receiver *actor.PID) inf.IBus {
 	s := r.SelectByServiceUid(sender.GetServiceUid())
 	c := r.SelectByServiceUid(receiver.GetServiceUid())
-	if c != nil && !actor.IsRetired(c.GetPID()) {
+	if c != nil && !actor.IsRetired(c.GetPid()) {
 		b := messagebus.NewMessageBus(s, c, nil)
 		return b
 	}
@@ -37,7 +49,7 @@ func (r *Repository) SelectBySvcUid(sender *actor.PID, serviceUid string) inf.IB
 	s := r.SelectByServiceUid(sender.GetServiceUid())
 	c := r.SelectByServiceUid(serviceUid)
 
-	if c != nil && !actor.IsRetired(c.GetPID()) {
+	if c != nil && !actor.IsRetired(c.GetPid()) {
 		b := messagebus.NewMessageBus(s, c, nil)
 		return b
 	}
@@ -48,7 +60,7 @@ func (r *Repository) SelectByRule(sender *actor.PID, rule func(pid *actor.PID) b
 	s := r.SelectByServiceUid(sender.GetServiceUid())
 	var returnList messagebus.MultiBus
 	r.mapPID.Range(func(key, value any) bool {
-		if rule(value.(inf.IRpcSender).GetPID()) {
+		if rule(value.(inf.IRpcSender).GetPid()) {
 			returnList = append(returnList, messagebus.NewMessageBus(s, value.(inf.IRpcSender), nil))
 		}
 		return true
@@ -64,7 +76,7 @@ func (r *Repository) Select(sender *actor.PID, serverId int32, serviceId, servic
 	return r.SelectBySvcUid(sender, serviceUid)
 }
 
-func (r *Repository) SelectByServiceType(sender *actor.PID, nodeType, serviceName string) inf.IBus {
+func (r *Repository) SelectByServiceType(sender *actor.PID, serverId int32, nodeType, serviceName string) inf.IBus {
 	r.mapNodeLock.RLock()
 	defer r.mapNodeLock.RUnlock()
 
@@ -74,19 +86,53 @@ func (r *Repository) SelectByServiceType(sender *actor.PID, nodeType, serviceNam
 		return list
 	}
 
-	serviceList, ok := nameUidMap[serviceName]
-	if !ok {
-		return list
+	var serviceList []string
+	if serviceName == "" {
+		for _, uidMap := range nameUidMap {
+			for serviceUid := range uidMap {
+				serviceList = append(serviceList, serviceUid)
+			}
+		}
+	} else {
+		uidMap, ok := nameUidMap[serviceName]
+		if !ok {
+			return list
+		}
+		for serviceUid := range uidMap {
+			serviceList = append(serviceList, serviceUid)
+		}
 	}
 
 	s := r.SelectByServiceUid(sender.GetServiceUid())
 
-	for serviceUid := range serviceList {
+	for _, serviceUid := range serviceList {
 		c := r.SelectByServiceUid(serviceUid)
-		if c != nil && !actor.IsRetired(c.GetPID()) {
+		if c != nil && !actor.IsRetired(c.GetPid()) && (serverId == 0 || c.GetPid().GetServerId() == serverId) {
 			list = append(list, messagebus.NewMessageBus(s, c, nil))
 		}
 	}
 
 	return list
+}
+
+func (r *Repository) SelectByFilterAndChoice(sender *actor.PID, filter func(pid *actor.PID) bool, choice func(pids []*actor.PID) []*actor.PID) inf.IBus {
+	s := r.SelectByServiceUid(sender.GetServiceUid())
+	var tmpList []*actor.PID
+	r.mapPID.Range(func(key, value any) bool {
+		if filter(value.(inf.IRpcSender).GetPid()) {
+			tmpList = append(tmpList, value.(inf.IRpcSender).GetPid())
+		}
+		return true
+	})
+
+	list := choice(tmpList)
+	var returnList messagebus.MultiBus
+	for _, pid := range list {
+		c := r.SelectByServiceUid(pid.GetServiceUid())
+		if c != nil && !actor.IsRetired(c.GetPid()) {
+			returnList = append(returnList, messagebus.NewMessageBus(s, c, nil))
+		}
+	}
+
+	return returnList
 }

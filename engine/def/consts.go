@@ -16,7 +16,7 @@ const (
 
 	DefaultConnectInterval             = 2 * time.Second
 	DefaultCheckRpcCallTimeoutInterval = 1 * time.Second
-	DefaultRpcTimeout                  = 3 * time.Second
+	DefaultRpcTimeout                  = time.Second
 )
 
 const (
@@ -31,7 +31,8 @@ const (
 )
 
 const (
-	SvcStatusInit     int32 = iota // 初始化
+	SvcStatusUnknown  int32 = iota // 未运行
+	SvcStatusInit                  // 初始化
 	SvcStatusStarting              // 启动中
 	SvcStatusRunning               // 运行中
 	SvcStatusClosing               // 关闭中
@@ -40,13 +41,31 @@ const (
 )
 
 const (
-	DefaultHttpRespMsg = "ok"
-)
-
-const (
-	DefaultHttpRespCode = 0 // 正常
-)
-
-const (
 	DefaultModuleIdSeed = 1_000_000 // 默认的moduleId开始序号
+)
+
+const (
+	DefaultRpcTypeLocal = "local"
+	DefaultRpcTypeRpcx  = "rpcx"
+)
+
+const (
+	DefaultPVPath           = "./cache"
+	DefaultPVCPath          = "./data"
+	DefaultLogPath          = "logs"
+	DefaultAntsPoolSize     = 10000
+	DefaultProfilerInterval = 10 * time.Second
+)
+
+const (
+	DefaultServiceUse = "local"
+)
+
+const (
+	DefaultDiscoveryUse = "etcd"
+)
+
+const (
+	DiscoveryConfUseLocal  = "local"
+	DiscoveryConfUseRemote = "remote"
 )

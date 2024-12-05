@@ -5,7 +5,6 @@ MysqlConf:
   Passwd: 123456
   Net: tcp
   Addr: 192.168.145.188:3306
-  # 数据库名字前缀(通常是 前缀_serverId)
   DBNamePrefix: login
   TimeZone: Local
   Timeout: 10s

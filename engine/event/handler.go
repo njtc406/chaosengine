@@ -12,20 +12,20 @@ import (
 
 type Handler struct {
 	sync.RWMutex
-	processor   inf.IProcessor
-	mapRegEvent map[inf.EventType]map[inf.IProcessor]interface{}
+	processor   inf.IEventProcessor
+	mapRegEvent map[inf.EventType]map[inf.IEventProcessor]interface{}
 }
 
-func NewHandler() inf.IHandler {
+func NewHandler() inf.IEventHandler {
 	return &Handler{}
 }
 
-func (h *Handler) Init(p inf.IProcessor) {
+func (h *Handler) Init(p inf.IEventProcessor) {
 	h.processor = p
-	h.mapRegEvent = make(map[inf.EventType]map[inf.IProcessor]interface{})
+	h.mapRegEvent = make(map[inf.EventType]map[inf.IEventProcessor]interface{})
 }
 
-func (h *Handler) GetEventProcessor() inf.IProcessor {
+func (h *Handler) GetEventProcessor() inf.IEventProcessor {
 	return h.processor
 }
 
@@ -47,20 +47,20 @@ func (h *Handler) Destroy() {
 	}
 }
 
-func (h *Handler) AddRegInfo(eventType inf.EventType, eventProcessor inf.IProcessor) {
+func (h *Handler) AddRegInfo(eventType inf.EventType, eventProcessor inf.IEventProcessor) {
 	h.Lock()
 	defer h.Unlock()
 	if h.mapRegEvent == nil {
-		h.mapRegEvent = map[inf.EventType]map[inf.IProcessor]interface{}{}
+		h.mapRegEvent = map[inf.EventType]map[inf.IEventProcessor]interface{}{}
 	}
 
 	if _, ok := h.mapRegEvent[eventType]; ok == false {
-		h.mapRegEvent[eventType] = map[inf.IProcessor]interface{}{}
+		h.mapRegEvent[eventType] = map[inf.IEventProcessor]interface{}{}
 	}
 	h.mapRegEvent[eventType][eventProcessor] = nil
 }
 
-func (h *Handler) RemoveRegInfo(eventType inf.EventType, eventProcessor inf.IProcessor) {
+func (h *Handler) RemoveRegInfo(eventType inf.EventType, eventProcessor inf.IEventProcessor) {
 	if _, ok := h.mapRegEvent[eventType]; ok == true {
 		delete(h.mapRegEvent[eventType], eventProcessor)
 	}

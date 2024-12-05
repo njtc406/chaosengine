@@ -6,9 +6,9 @@
 package cluster
 
 import (
-	"github.com/njtc406/chaosengine/engine/cluster/config"
 	"github.com/njtc406/chaosengine/engine/cluster/discovery"
 	"github.com/njtc406/chaosengine/engine/cluster/endpoints"
+	"github.com/njtc406/chaosengine/engine/config"
 	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/event"
 	"github.com/njtc406/chaosengine/engine/inf"
@@ -24,8 +24,6 @@ func GetCluster() *Cluster {
 
 type Cluster struct {
 	closed chan struct{}
-	// 集群配置
-	conf *config.Config
 
 	// 服务发现
 	discovery inf.IDiscovery
@@ -34,29 +32,23 @@ type Cluster struct {
 	endpoints *endpoints.EndpointManager
 
 	// 事件
-	eventProcessor inf.IProcessor
+	eventProcessor inf.IEventProcessor
 	eventChannel   chan inf.IEvent
 }
 
-func (c *Cluster) initConfig(confPath string) {
-	c.conf = config.Init(confPath)
-}
-
-func (c *Cluster) Init(confPath string) {
-	// 加载集群配置
-	c.initConfig(confPath)
-
+func (c *Cluster) Init() {
 	c.closed = make(chan struct{})
 	c.eventChannel = make(chan inf.IEvent, 1024)
 	c.eventProcessor = event.NewProcessor()
 	c.eventProcessor.Init(c)
 
-	c.endpoints = endpoints.GetEndpointManager()
-	c.endpoints.Init(c.conf.RPCServer.Addr, c.eventProcessor)
+	c.endpoints = endpoints.GetEndpointManager().Init(c.eventProcessor)
 
-	c.discovery = discovery.CreateDiscovery(c.conf.DiscoveryUse)
-	log.SysLogger.Debugf("discovery use %s    conf:%+v", c.conf.DiscoveryUse, c.conf.DiscoveryConf[c.conf.DiscoveryUse])
-	if err := c.discovery.Init(c.conf.DiscoveryConf[c.conf.DiscoveryUse], c.eventProcessor); err != nil {
+	c.discovery = discovery.CreateDiscovery(config.Conf.ClusterConf.DiscoveryType)
+	if c.discovery == nil {
+		return
+	}
+	if err := c.discovery.Init(c.eventProcessor); err != nil {
 		log.SysLogger.Fatalf("init discovery error:%v", err)
 	}
 }

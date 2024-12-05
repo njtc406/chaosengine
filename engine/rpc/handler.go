@@ -19,6 +19,13 @@ import (
 	"unicode/utf8"
 )
 
+var apiPreFix = []string{
+	"Api", "API",
+}
+var rpcPreFix = []string{
+	"Rpc", "RPC",
+}
+
 type MethodInfo struct {
 	Method   reflect.Method
 	In       []reflect.Type
@@ -56,6 +63,16 @@ func isExported(name string) bool {
 	return unicode.IsUpper(r)
 }
 
+func hasPrefix(str string, ls []string) bool {
+	for _, s := range ls {
+		if strings.HasPrefix(str, s) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (h *Handler) isExportedOrBuiltinType(t reflect.Type) bool {
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
@@ -67,14 +84,14 @@ func (h *Handler) isExportedOrBuiltinType(t reflect.Type) bool {
 
 func (h *Handler) suitableMethods(method reflect.Method) error {
 	// 只有以API或者rpc开头的方法才注册
-	if !strings.HasPrefix(method.Name, "API") && !strings.HasPrefix(method.Name, "API_") {
-		if !strings.HasPrefix(method.Name, "RPC") && !strings.HasPrefix(method.Name, "RPC_") {
+	if !hasPrefix(method.Name, apiPreFix) {
+		if !hasPrefix(method.Name, rpcPreFix) {
 			// 不是API或者RPC开头的方法,直接返回
 			return nil
 		}
 
 		if !h.isPublic {
-			// 走到这说明有rpc方法
+			// 走到这说明有rpc方法,那么service即为公开服务,可以被远程调用
 			h.isPublic = true
 		}
 	}
@@ -90,7 +107,8 @@ func (h *Handler) suitableMethods(method reflect.Method) error {
 		in = append(in, method.Type.In(i))
 	}
 
-	// 最多两个返回值,一个结果,一个错误
+	// TODO 如果是rpc方法,实际上最多只有一个入参和一个返回值(除去错误),看这里要不要校验一下,防止写错
+
 	var outs []reflect.Type
 
 	// 计算除了error,还有几个返回值
@@ -131,11 +149,15 @@ func (h *Handler) suitableMethods(method reflect.Method) error {
 func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.SysLogger.Errorf("service[%s] handle message panic: %v\n trace:%s", h.GetName(), r, debug.Stack())
+			log.SysLogger.Errorf("service[%s] handle message from caller: %s panic: %v\n trace:%s", h.GetName(), envelope.GetSenderPid().String(), r, debug.Stack())
+			envelope.SetResponse(nil)
+			envelope.SetError(errdef.HandleMessagePanic)
 		}
+
+		h.doResponse(envelope)
 	}()
 
-	log.SysLogger.Debugf("rpc request handler -> begin handle message: %+v", envelope)
+	//log.SysLogger.Debugf("rpc request handler -> begin handle message: %+v", envelope)
 
 	var (
 		params  []reflect.Value
@@ -145,21 +167,34 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 	methodInfo, ok := h.methodMap[envelope.GetMethod()]
 	if !ok {
 		envelope.SetError(errdef.MethodNotFound)
-		goto DoResponse
+		return
 	}
 
 	params = append(params, reflect.ValueOf(h.GetRpcHandler()))
-	if len(methodInfo.In) > 0 {
-		// 有输入参数
+	if len(methodInfo.In) > 1 { // 需要排除第一个参数
+		// 需要输入参数
 		req := envelope.GetRequest()
-		switch req.(type) {
-		case []interface{}: // 为了支持本地调用时多参数
-			for _, param := range req.([]interface{}) {
-				params = append(params, reflect.ValueOf(param))
+		if req == nil {
+			// 兼容入参给了nil
+			for i := 1; i < len(methodInfo.In); i++ {
+				params = append(params, reflect.Zero(methodInfo.In[i]))
 			}
-		case interface{}:
-			params = append(params, reflect.ValueOf(req))
+		} else {
+			switch req.(type) {
+			case []interface{}: // 支持本地调用时多参数
+				for _, param := range req.([]interface{}) {
+					params = append(params, reflect.ValueOf(param))
+				}
+			default:
+				params = append(params, reflect.ValueOf(req))
+			}
 		}
+	}
+
+	if len(params) != len(methodInfo.In) {
+		log.SysLogger.Errorf("method[%s] param count not match, need: %d  got: %d", envelope.GetMethod(), len(methodInfo.In), len(params))
+		envelope.SetError(errdef.InputParamNotMatch)
+		return
 	}
 
 	results = methodInfo.Method.Func.Call(params)
@@ -167,12 +202,12 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 		// 这里应该不会触发,因为参数检查的时候已经做过了
 		log.SysLogger.Errorf("method[%s] return value count not match", envelope.GetMethod())
 		envelope.SetError(errdef.OutputParamNotMatch)
-		goto DoResponse
+		return
 	}
 
 	if len(results) == 0 {
 		// 没有返回值
-		goto DoResponse
+		return
 	}
 
 	// 解析返回
@@ -186,8 +221,9 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 			t.Kind() == reflect.Chan {
 			if t.Implements(reflect.TypeOf((*error)(nil)).Elem()) {
 				if err, ok := result.Interface().(error); ok && err != nil {
+					// 只要返回了错误,其他数据都不再接收
 					envelope.SetError(err)
-					goto DoResponse
+					return
 				} else {
 					continue
 				}
@@ -206,12 +242,7 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 				}
 			}
 		} else {
-			var res interface{}
-			if result.IsNil() {
-				res = nil
-			} else {
-				res = result.Interface()
-			}
+			res := result.Interface()
 
 			if methodInfo.MultiOut {
 				resp = append(resp, res)
@@ -225,21 +256,23 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 		// 兼容多返回参数
 		envelope.SetResponse(resp)
 	}
+}
 
-DoResponse:
+func (h *Handler) doResponse(envelope inf.IEnvelope) {
+	if !envelope.IsRef() {
+		// 已经被释放,丢弃
+		return
+	}
 	if envelope.NeedResponse() {
-		log.SysLogger.Debugf("============>>>>>>>>>>>>1111111111111111111111111")
 		// 需要回复
 		envelope.SetReply()      // 这是回复
 		envelope.SetRequest(nil) // 清除请求数据
 
 		// 发送回复信息
-		if err := envelope.GetSenderClient().SendResponse(envelope); err != nil {
+		if err := envelope.GetSender().SendResponse(envelope); err != nil {
 			log.SysLogger.Errorf("service[%s] send response failed: %v", h.GetName(), err)
-			msgenvelope.ReleaseMsgEnvelope(envelope)
 		}
 	} else {
-		log.SysLogger.Debugf("============>>>>>>>>>>>>22222222222222222222222222")
 		// 不需要回复,释放资源
 		msgenvelope.ReleaseMsgEnvelope(envelope)
 	}
@@ -263,8 +296,8 @@ func (h *Handler) GetName() string {
 	return h.IRpcHandler.GetName()
 }
 
-func (h *Handler) GetPID() *actor.PID {
-	return h.IRpcHandler.GetPID()
+func (h *Handler) GetPid() *actor.PID {
+	return h.IRpcHandler.GetPid()
 }
 
 func (h *Handler) GetRpcHandler() inf.IRpcHandler {

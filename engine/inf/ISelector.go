@@ -18,5 +18,7 @@ type ISelector interface {
 
 	SelectByPid(sender, receiver *actor.PID) IBus
 
-	SelectByServiceType(sender *actor.PID, serviceType, serviceName string) IBus
+	SelectByServiceType(sender *actor.PID, serverId int32, serviceType, serviceName string) IBus
+
+	SelectByFilterAndChoice(sender *actor.PID, filter func(pid *actor.PID) bool, choice func(pids []*actor.PID) []*actor.PID) IBus
 }

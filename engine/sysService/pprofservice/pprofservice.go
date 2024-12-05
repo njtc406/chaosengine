@@ -7,9 +7,10 @@ package pprofservice
 
 import (
 	"github.com/gin-gonic/gin"
+	sysConfig "github.com/njtc406/chaosengine/engine/config"
 	"github.com/njtc406/chaosengine/engine/core"
-	"github.com/njtc406/chaosengine/engine/node"
-	nodeConfig "github.com/njtc406/chaosengine/engine/node/config"
+	"github.com/njtc406/chaosengine/engine/inf"
+	"github.com/njtc406/chaosengine/engine/services"
 	"github.com/njtc406/chaosengine/engine/sysModule/httpmodule"
 	"github.com/njtc406/chaosengine/engine/sysModule/httpmodule/router_center"
 	"github.com/njtc406/chaosengine/engine/sysService/pprofservice/config"
@@ -19,14 +20,17 @@ import (
 )
 
 func init() {
-	node.SetupBase(&PprofService{})
-	nodeConfig.RegisterConf(&nodeConfig.ConfInfo{
+	services.SetService("PprofService", func() inf.IService { return &PprofService{} })
+	sysConfig.RegisterServiceConf(&sysConfig.ServiceConfig{
 		ServiceName:   "PprofService",
 		ConfName:      "pprof",
 		ConfType:      "yaml",
 		ConfPath:      "",
-		Cfg:           &config.PprofConf{},
+		CfgCreator:    func() interface{} { return &config.PprofConf{} },
 		DefaultSetFun: config.SetPprofConfDefault,
+		OnChangeFun: func() {
+			// TODO 配置变更回调
+		},
 	})
 }
 
@@ -41,7 +45,7 @@ func (ps *PprofService) getConf() *config.PprofConf {
 }
 
 func (ps *PprofService) OnInit() error {
-	ps.httpModule = httpmodule.NewHttpModule(ps.getConf().PprofConf, log.SysLogger, nodeConfig.Conf.SystemStatus)
+	ps.httpModule = httpmodule.NewHttpModule(ps.getConf().PprofConf, log.SysLogger, sysConfig.GetStatus())
 	ps.httpModule.SetRouter(ps.initRouter())
 	_, err := ps.AddModule(ps.httpModule)
 	if err != nil {

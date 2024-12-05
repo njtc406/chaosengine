@@ -13,7 +13,6 @@ import (
 	"github.com/smallnest/rpcx/share"
 	"time"
 
-	"github.com/njtc406/chaosengine/engine/actor"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/smallnest/rpcx/client"
@@ -21,15 +20,16 @@ import (
 
 // 远程服务的Client
 
-type RemoteSender struct {
-	SenderBase
+type rpcxSender struct {
+	inf.IRpcSender
 	rpcClient client.XClient
 }
 
-func NewRemoteClient(pid *actor.PID) inf.IRpcSender {
+func newRemoteClient(sender inf.IRpcSender) inf.IRpcSenderHandler {
+	pid := sender.GetPid()
 	d, _ := client.NewPeer2PeerDiscovery("tcp@"+pid.GetAddress(), "")
 	// 如果调用失败,会自动重试3次
-	rpcClient := client.NewXClient("RPCMonitor", client.Failtry, client.RandomSelect, d, client.Option{
+	rpcClient := client.NewXClient("RpcListener", client.Failtry, client.RandomSelect, d, client.Option{
 		Retries:             3, // 重试3次
 		RPCPath:             share.DefaultRPCPath,
 		ConnectTimeout:      time.Second,           // 连接超时
@@ -42,16 +42,16 @@ func NewRemoteClient(pid *actor.PID) inf.IRpcSender {
 		TimeToDisallow:      time.Minute,
 	})
 
-	remoteClient := &RemoteSender{
-		rpcClient: rpcClient,
+	remoteClient := &rpcxSender{
+		IRpcSender: sender,
+		rpcClient:  rpcClient,
 	}
-	remoteClient.pid = pid
 
 	log.SysLogger.Infof("create remote client success : %s", pid.String())
 	return remoteClient
 }
 
-func (rc *RemoteSender) Close() {
+func (rc *rpcxSender) Close() {
 	if rc.rpcClient == nil {
 		return
 	}
@@ -61,16 +61,13 @@ func (rc *RemoteSender) Close() {
 	rc.rpcClient = nil
 }
 
-func (rc *RemoteSender) send(envelope inf.IEnvelope) error {
-	defer msgenvelope.ReleaseMsgEnvelope(envelope)
+func (rc *rpcxSender) send(envelope inf.IEnvelope) error {
 	if rc.rpcClient == nil {
 		return errdef.RPCHadClosed
 	}
 	// 这里仅仅代表消息发送成功
 	ctx, cancel := context.WithTimeout(context.Background(), envelope.GetTimeout())
 	defer cancel()
-
-	// TODO 如果消息内容太大,需要考虑压缩消息(会有点应影响效率)
 
 	// 构建发送消息
 	msg := envelope.ToProtoMsg()
@@ -79,25 +76,24 @@ func (rc *RemoteSender) send(envelope inf.IEnvelope) error {
 	}
 
 	if _, err := rc.rpcClient.Go(ctx, "RPCCall", msg, nil, nil); err != nil {
-		log.SysLogger.Errorf("send message[%+v] to %s is error: %s", envelope, rc.GetPID().GetServiceUid(), err)
+		log.SysLogger.Errorf("send message[%+v] to %s is error: %s", envelope, rc.IRpcSender.GetPid().GetServiceUid(), err)
 		return errdef.RPCCallFailed
 	}
 
 	return nil
 }
 
-func (rc *RemoteSender) SendRequest(envelope inf.IEnvelope) error {
+func (rc *rpcxSender) SendRequest(envelope inf.IEnvelope) error {
+	// 这里不能释放envelope,因为调用方需要使用
 	return rc.send(envelope)
 }
 
-func (rc *RemoteSender) SendRequestAndRelease(envelope inf.IEnvelope) error {
-	// 回收envelope
+func (rc *rpcxSender) SendRequestAndRelease(envelope inf.IEnvelope) error {
 	defer msgenvelope.ReleaseMsgEnvelope(envelope)
 	return rc.send(envelope)
 }
 
-func (rc *RemoteSender) SendResponse(envelope inf.IEnvelope) error {
-	// 回收envelope
+func (rc *rpcxSender) SendResponse(envelope inf.IEnvelope) error {
 	defer msgenvelope.ReleaseMsgEnvelope(envelope)
 	return rc.send(envelope)
 }
