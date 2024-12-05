@@ -29,7 +29,7 @@ func NewRPCListener(cliFactory inf.IRpcSenderFactory) *RPCListener {
 // TODO 处理ReqId重复发送的问题
 
 func (rm *RPCListener) RPCCall(_ context.Context, req *actor.Message, _ *dto.RPCResponse) error {
-	//log.SysLogger.Debugf("rpc call: %+v", req)
+	log.SysLogger.Debugf("rpc call: %+v", req)
 	if req.Reply {
 		// 回复
 		// 需要回复的信息都会加入monitor中,找到对应的信封

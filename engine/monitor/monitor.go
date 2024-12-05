@@ -84,7 +84,7 @@ func (rm *RpcMonitor) tick() {
 
 		log.SysLogger.Debugf("RPC call takes more than %d seconds,method is %s", int64(envelope.GetTimeout().Seconds()), envelope.GetMethod())
 		// 调用超时,执行超时回调
-		rm.futureCallTimeout(envelope)
+		rm.callTimeout(envelope)
 		rm.locker.Unlock()
 		continue
 	}
@@ -133,9 +133,9 @@ func (rm *RpcMonitor) Get(id uint64) inf.IEnvelope {
 	return rm.waitMap[id]
 }
 
-func (rm *RpcMonitor) futureCallTimeout(envelope inf.IEnvelope) {
+func (rm *RpcMonitor) callTimeout(envelope inf.IEnvelope) {
 	if !envelope.IsRef() {
-		log.SysLogger.Errorf("envelope is not ref")
+		log.SysLogger.Debug("envelope is not ref")
 		return // 已经被释放,丢弃
 	}
 
@@ -150,7 +150,6 @@ func (rm *RpcMonitor) futureCallTimeout(envelope inf.IEnvelope) {
 			log.SysLogger.Errorf("send call timeout response error:%s", err.Error())
 		}
 	} else {
-		log.SysLogger.Debugf("=================time out, no callback==================")
 		envelope.Done()
 	}
 }

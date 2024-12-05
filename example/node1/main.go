@@ -11,6 +11,8 @@ import (
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/services"
 	"github.com/njtc406/chaosengine/engine/utils/log"
+	"github.com/njtc406/chaosengine/engine/utils/timer"
+	"time"
 )
 
 type Service1 struct {
@@ -43,12 +45,17 @@ func (s *Service1) OnInit() error {
 	//	log.SysLogger.Debugf("call Service2.APISum out:%d", out)
 	//})
 	//
-	//s.AfterFunc(time.Second*3, func(iTimer timer.ITimer) {
-	//	// 调用Service2.APITest2 不同类型入参
-	//	if err := s.SelectSameServer("", "Service2").Call("APIPrintParams", []interface{}{1, "2"}, nil); err != nil {
-	//		log.SysLogger.Errorf("call Service2.APIPrintParams failed, err:%v", err)
-	//	}
-	//})
+	s.AfterFunc(time.Second*3, func(iTimer timer.ITimer) {
+		// 调用Service2.APITest2 不同类型入参
+		if err := s.SelectSameServer("", "Service2").Call("APIPrintParams", []interface{}{1, "2"}, nil); err != nil {
+			log.SysLogger.Errorf("call Service2.APIPrintParams failed, err:%v", err)
+		}
+
+		// 模拟有入参,但是不传
+		if err := s.SelectSameServer("", "Service2").Call("APIPrintParams", nil, nil); err != nil {
+			log.SysLogger.Errorf("call Service2.APIPrintParams failed, err:%v", err)
+		}
+	})
 	//s.AfterFunc(time.Second*4, func(iTimer timer.ITimer) {
 	//	// 调用Service2.APITest2 可变参数
 	//	type abc struct{ a, b int }
@@ -87,27 +94,33 @@ func (s *Service1) OnInit() error {
 	//	}
 	//})
 	//s.AfterFunc(time.Second*2, func(iTimer timer.ITimer) {
-	//out := &msg.Msg_Test_Resp{}
-	//if err := s.SelectSameServer("", "Service3").Call("RPCSum", &msg.Msg_Test_Req{A: 1, B: 2}, out); err != nil {
-	//	log.SysLogger.Errorf("call Service3.RPCSum failed, err:%v", err)
-	//}
-	//if err := s.SelectSameServer("", "Service3").Send("RPCSum", &msg.Msg_Test_Req{A: 1, B: 3}); err != nil {
-	//	log.SysLogger.Errorf("send Service3.RPCSum failed, err:%v", err)
-	//}
-	//if _, err := s.SelectSameServer("", "Service3").AsyncCall("RPCSum", time.Second, &msg.Msg_Test_Req{A: 1, B: 2}, func(data interface{}, err error) {
-	//	if err != nil {
-	//		log.SysLogger.Errorf("AsyncCall Service3.RPCSum response failed, err:%v", err)
-	//		return
+	//	out := &msg.Msg_Test_Resp{}
+	//	if err := s.SelectSameServer("", "Service3").Call("RPCSum", &msg.Msg_Test_Req{A: 1, B: 2}, out); err != nil {
+	//		log.SysLogger.Errorf("call Service3.RPCSum failed, err:%v", err)
 	//	}
-	//	resp := data.(*msg.Msg_Test_Resp)
-	//	log.SysLogger.Debugf("AsyncCall Service3.RPCSum out:%d", resp.Ret)
-	//}); err != nil {
-	//	log.SysLogger.Errorf("AsyncCall Service3.RPCSum failed, err:%v", err)
-	//}
-
-	//if err := s.SelectSameServer("", "Service3").Call("RPCTestWithError", &msg.Msg_Test_Req{A: 1, B: 2}, out); err != nil {
-	//	log.SysLogger.Errorf("call Service3.RPCPrintParams failed, err:%v", err)
-	//}
+	//	if err := s.SelectSameServer("", "Service3").Send("RPCSum", &msg.Msg_Test_Req{A: 1, B: 3}); err != nil {
+	//		log.SysLogger.Errorf("send Service3.RPCSum failed, err:%v", err)
+	//	}
+	//	if _, err := s.SelectSameServer("", "Service3").AsyncCall("RPCSum", time.Second, &msg.Msg_Test_Req{A: 1, B: 2}, func(data interface{}, err error) {
+	//		if err != nil {
+	//			log.SysLogger.Errorf("AsyncCall Service3.RPCSum response failed, err:%v", err)
+	//			return
+	//		}
+	//		resp := data.(*msg.Msg_Test_Resp)
+	//		log.SysLogger.Debugf("AsyncCall Service3.RPCSum out:%d", resp.Ret)
+	//	}); err != nil {
+	//		log.SysLogger.Errorf("AsyncCall Service3.RPCSum failed, err:%v", err)
+	//	}
+	//
+	//	// 测试调用对象返回,但是不接收
+	//	if err := s.SelectSameServer("", "Service3").Call("RPCTestWithError", &msg.Msg_Test_Req{A: 1, B: 2}, nil); err != nil {
+	//		log.SysLogger.Errorf("call Service3.RPCPrintParams failed, err:%v", err)
+	//	}
+	//
+	//	// 测试调用对象有参数,但是使用nil的情形
+	//	if err := s.SelectSameServer("", "Service3").CallWithTimeout("RpcTestWithError", time.Second*3, nil, nil); err != nil {
+	//		log.SysLogger.Errorf("call Service3.RPCPrintParams failed, err:%v", err)
+	//	}
 	//})
 
 	// cast test

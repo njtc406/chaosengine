@@ -16,6 +16,7 @@ var (
 	RPCCallFailed           = errors.New("rpc call failed")                           // RPC 调用失败
 	ParamNotMatch           = errors.New("param not match")                           // 参数不匹配
 	InputParamCantUseStruct = errors.New("input param can't use struct, must be ptr") // 输入参数不能使用结构体,必须是结构体指针
+	InputParamNotMatch      = errors.New("input param not match")                     // 输入参数不匹配
 	OutputParamNotMatch     = errors.New("output param not match")                    // 输出参数不匹配
 	MethodNotFound          = errors.New("method not found")                          // 方法未找到
 	RPCHadClosed            = errors.New("rpc had closed")                            // RPC 已经关闭

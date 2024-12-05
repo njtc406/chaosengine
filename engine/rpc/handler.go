@@ -171,17 +171,30 @@ func (h *Handler) HandleRequest(envelope inf.IEnvelope) {
 	}
 
 	params = append(params, reflect.ValueOf(h.GetRpcHandler()))
-	if len(methodInfo.In) > 0 {
-		// 有输入参数
+	if len(methodInfo.In) > 1 { // 需要排除第一个参数
+		// 需要输入参数
 		req := envelope.GetRequest()
-		switch req.(type) {
-		case []interface{}: // 为了支持本地调用时多参数
-			for _, param := range req.([]interface{}) {
-				params = append(params, reflect.ValueOf(param))
+		if req == nil {
+			// 兼容入参给了nil
+			for i := 1; i < len(methodInfo.In); i++ {
+				params = append(params, reflect.Zero(methodInfo.In[i]))
 			}
-		case interface{}:
-			params = append(params, reflect.ValueOf(req))
+		} else {
+			switch req.(type) {
+			case []interface{}: // 支持本地调用时多参数
+				for _, param := range req.([]interface{}) {
+					params = append(params, reflect.ValueOf(param))
+				}
+			default:
+				params = append(params, reflect.ValueOf(req))
+			}
 		}
+	}
+
+	if len(params) != len(methodInfo.In) {
+		log.SysLogger.Errorf("method[%s] param count not match, need: %d  got: %d", envelope.GetMethod(), len(methodInfo.In), len(params))
+		envelope.SetError(errdef.InputParamNotMatch)
+		return
 	}
 
 	results = methodInfo.Method.Func.Call(params)
