@@ -76,7 +76,7 @@ func (r *Repository) AddTmp(sender inf.IRpcSender) inf.IRpcSender {
 		sender: sender,
 		latest: timelib.GetTime(),
 	}
-	r.tmpMapPid.LoadOrStore(sender.GetPid().GetServiceUid(), tmp)
+	r.tmpMapPid.Store(sender.GetPid().GetServiceUid(), tmp)
 	//log.SysLogger.Infof("add tmp service: %s", sender.GetPid().GetServiceUid())
 	return sender
 }
