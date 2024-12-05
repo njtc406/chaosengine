@@ -23,8 +23,8 @@ func (em *EndpointManager) SelectByRule(sender *actor.PID, rule func(pid *actor.
 	return em.repository.SelectByRule(sender, rule)
 }
 
-func (em *EndpointManager) SelectByServiceType(sender *actor.PID, nodeType, serviceName string) inf.IBus {
-	return em.repository.SelectByServiceType(sender, nodeType, serviceName)
+func (em *EndpointManager) SelectByServiceType(sender *actor.PID, serverId int32, serviceType, serviceName string) inf.IBus {
+	return em.repository.SelectByServiceType(sender, serverId, serviceType, serviceName)
 }
 
 func (em *EndpointManager) SelectByFilterAndChoice(sender *actor.PID, filter func(pid *actor.PID) bool, choice func(pids []*actor.PID) []*actor.PID) inf.IBus {

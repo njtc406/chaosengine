@@ -45,13 +45,13 @@ func (r *DefaultRemote) Init(conf *config.RPCServer, cliFactory inf.IRpcSenderFa
 
 func (r *DefaultRemote) Serve() error {
 	// 注册rpc监听服务
-	if err := r.svr.Register(r.listener, ""); err != nil {
+	if err := r.svr.RegisterName("RpcListener", r.listener, ""); err != nil {
 		return err
 	}
 
 	go func() {
 		if err := r.svr.Serve(r.conf.Protoc, r.conf.Addr); err != nil {
-			log.SysLogger.Errorf("rpc serve stop: %v", err)
+			log.SysLogger.Warnf("rpc serve stop: %v", err)
 		}
 	}()
 

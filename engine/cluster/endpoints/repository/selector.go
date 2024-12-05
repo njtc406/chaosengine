@@ -64,7 +64,7 @@ func (r *Repository) Select(sender *actor.PID, serverId int32, serviceId, servic
 	return r.SelectBySvcUid(sender, serviceUid)
 }
 
-func (r *Repository) SelectByServiceType(sender *actor.PID, nodeType, serviceName string) inf.IBus {
+func (r *Repository) SelectByServiceType(sender *actor.PID, serverId int32, nodeType, serviceName string) inf.IBus {
 	r.mapNodeLock.RLock()
 	defer r.mapNodeLock.RUnlock()
 
@@ -74,16 +74,28 @@ func (r *Repository) SelectByServiceType(sender *actor.PID, nodeType, serviceNam
 		return list
 	}
 
-	serviceList, ok := nameUidMap[serviceName]
-	if !ok {
-		return list
+	var serviceList []string
+	if serviceName == "" {
+		for _, uidMap := range nameUidMap {
+			for serviceUid := range uidMap {
+				serviceList = append(serviceList, serviceUid)
+			}
+		}
+	} else {
+		uidMap, ok := nameUidMap[serviceName]
+		if !ok {
+			return list
+		}
+		for serviceUid := range uidMap {
+			serviceList = append(serviceList, serviceUid)
+		}
 	}
 
 	s := r.SelectByServiceUid(sender.GetServiceUid())
 
-	for serviceUid := range serviceList {
+	for _, serviceUid := range serviceList {
 		c := r.SelectByServiceUid(serviceUid)
-		if c != nil && !actor.IsRetired(c.GetPID()) {
+		if c != nil && !actor.IsRetired(c.GetPID()) && (serverId == 0 || c.GetPID().GetServerId() == serverId) {
 			list = append(list, messagebus.NewMessageBus(s, c, nil))
 		}
 	}

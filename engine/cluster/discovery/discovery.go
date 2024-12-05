@@ -307,10 +307,7 @@ func (d *EtcdDiscovery) addService(ev inf.IEvent) {
 			}
 
 			log.SysLogger.Infof("etcd register service success: %v", pid.String())
-			asynclib.Go(func() {
-				// 启动心跳
-				d.keepaliveForever(watcher)
-			})
+			d.startKeepalive(watcher)
 		}
 	}
 }

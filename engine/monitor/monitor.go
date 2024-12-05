@@ -72,13 +72,16 @@ func (rm *RpcMonitor) tick() {
 		}
 
 		envelope := rm.waitMap[id]
-		if envelope == nil {
+
+		// 直接删除
+		delete(rm.waitMap, id)
+
+		if envelope == nil || !envelope.IsRef() {
 			rm.locker.Unlock()
 			log.SysLogger.Errorf("call seq is not find,seq:%d", id)
 			continue
 		}
 
-		delete(rm.waitMap, id)
 		log.SysLogger.Debugf("RPC call takes more than %d seconds,method is %s", int64(envelope.GetTimeout().Seconds()), envelope.GetMethod())
 		// 调用超时,执行超时回调
 		rm.futureCallTimeout(envelope)
@@ -132,7 +135,7 @@ func (rm *RpcMonitor) Get(id uint64) inf.IEnvelope {
 
 func (rm *RpcMonitor) futureCallTimeout(envelope inf.IEnvelope) {
 	if !envelope.IsRef() {
-		log.SysLogger.Errorf("future is not ref,pid:%s", envelope.GetSender().String())
+		log.SysLogger.Errorf("envelope is not ref")
 		return // 已经被释放,丢弃
 	}
 

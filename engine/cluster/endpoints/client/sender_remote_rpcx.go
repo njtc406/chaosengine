@@ -29,7 +29,7 @@ type rpcxSender struct {
 func newRemoteClient(pid *actor.PID, _ inf.IRpcHandler) inf.IRpcSender {
 	d, _ := client.NewPeer2PeerDiscovery("tcp@"+pid.GetAddress(), "")
 	// 如果调用失败,会自动重试3次
-	rpcClient := client.NewXClient("RPCMonitor", client.Failtry, client.RandomSelect, d, client.Option{
+	rpcClient := client.NewXClient("RpcListener", client.Failtry, client.RandomSelect, d, client.Option{
 		Retries:             3, // 重试3次
 		RPCPath:             share.DefaultRPCPath,
 		ConnectTimeout:      time.Second,           // 连接超时
@@ -62,7 +62,6 @@ func (rc *rpcxSender) Close() {
 }
 
 func (rc *rpcxSender) send(envelope inf.IEnvelope) error {
-	defer msgenvelope.ReleaseMsgEnvelope(envelope)
 	if rc.rpcClient == nil {
 		return errdef.RPCHadClosed
 	}
@@ -85,13 +84,16 @@ func (rc *rpcxSender) send(envelope inf.IEnvelope) error {
 }
 
 func (rc *rpcxSender) SendRequest(envelope inf.IEnvelope) error {
+	// 这里不能释放envelope,因为调用方需要使用
 	return rc.send(envelope)
 }
 
 func (rc *rpcxSender) SendRequestAndRelease(envelope inf.IEnvelope) error {
+	defer msgenvelope.ReleaseMsgEnvelope(envelope)
 	return rc.send(envelope)
 }
 
 func (rc *rpcxSender) SendResponse(envelope inf.IEnvelope) error {
+	defer msgenvelope.ReleaseMsgEnvelope(envelope)
 	return rc.send(envelope)
 }

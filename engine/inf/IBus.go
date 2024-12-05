@@ -17,9 +17,7 @@ type IBus interface {
 	Call(method string, in, out interface{}) error
 	CallWithTimeout(method string, timeout time.Duration, in, out interface{}) error
 	// AsyncCall 异步调用服务
-	AsyncCall(method string, timeout time.Duration, callbacks []dto.CompletionFunc, in interface{}) (dto.CancelRpc, error)
+	AsyncCall(method string, timeout time.Duration, in interface{}, callbacks ...dto.CompletionFunc) (dto.CancelRpc, error)
 	// Send 无返回调用
 	Send(method string, in interface{}) error
-	// Cast 广播调用
-	Cast(method string, in interface{}) error
 }

@@ -34,7 +34,9 @@ type IRpcSelector interface {
 	SelectByRule(rule func(pid *actor.PID) bool) IBus
 
 	// SelectByServiceType 根据服务类型选择服务
-	SelectByServiceType(serviceType, serviceName string, filters ...func(pid *actor.PID) bool) IBus
+	SelectByServiceType(serverId int32, serviceType, serviceName string, filters ...func(pid *actor.PID) bool) IBus
+
+	SelectSameServerByServiceType(serviceType, serviceName string, filters ...func(pid *actor.PID) bool) IBus
 }
 
 type IRpcChannel interface {

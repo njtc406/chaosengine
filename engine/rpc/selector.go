@@ -5,6 +5,7 @@ import (
 	"github.com/njtc406/chaosengine/engine/cluster/endpoints"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/messagebus"
+	"github.com/njtc406/chaosengine/engine/utils/log"
 )
 
 // Select 选择服务
@@ -28,8 +29,8 @@ func (h *Handler) SelectByRule(rule func(pid *actor.PID) bool) inf.IBus {
 }
 
 // SelectByServiceType 根据类型选择服务
-func (h *Handler) SelectByServiceType(serviceType, serviceName string, filters ...func(pid *actor.PID) bool) inf.IBus {
-	list := endpoints.GetEndpointManager().SelectByServiceType(h.GetPID(), serviceType, serviceName)
+func (h *Handler) SelectByServiceType(serverId int32, serviceType, serviceName string, filters ...func(pid *actor.PID) bool) inf.IBus {
+	list := endpoints.GetEndpointManager().SelectByServiceType(h.GetPID(), serverId, serviceType, serviceName)
 
 	var returnList messagebus.MultiBus
 	if len(filters) == 0 {
@@ -47,4 +48,21 @@ func (h *Handler) SelectByServiceType(serviceType, serviceName string, filters .
 
 func (h *Handler) SelectByFilterAndChoice(filter func(pid *actor.PID) bool, choice func(pids []*actor.PID) []*actor.PID) inf.IBus {
 	return endpoints.GetEndpointManager().SelectByFilterAndChoice(h.GetPID(), filter, choice)
+}
+
+func (h *Handler) SelectSameServerByServiceType(serviceType, serviceName string, filters ...func(pid *actor.PID) bool) inf.IBus {
+	list := endpoints.GetEndpointManager().SelectByServiceType(h.GetPID(), h.GetPID().GetServerId(), serviceType, serviceName)
+	log.SysLogger.Debugf("list len: %+v", list)
+	var returnList messagebus.MultiBus
+	if len(filters) == 0 {
+		return list
+	}
+	for _, filter := range filters {
+		for _, bus := range list.(messagebus.MultiBus) {
+			if filter(bus.(inf.IRpcSender).GetPID()) {
+				returnList = append(returnList, bus)
+			}
+		}
+	}
+	return returnList
 }

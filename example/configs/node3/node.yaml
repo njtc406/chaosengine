@@ -26,12 +26,13 @@ ClusterConf:
     Password: 123456
   RPCServer:
     # 监听地址
-    Addr: 0.0.0.0:6688
+    Addr: 0.0.0.0:6690
     # 协议
     Protoc: "tcp"
   RemoteType: rpcx
   DiscoveryType: etcd
   RemoteConfPath: ""
+  # 服务发现监听路径
   DiscoveryConf:
     Path: /server/rpc
 
@@ -40,9 +41,9 @@ ServiceConf:
   RemoteConfPath: ""
   StartServices:
     # 服务名称
-    - ServiceName: Service1
+    - ServiceName: Service4
       # 服务类型
-      Type: test
+      Type: test1
       # 服务器ID
       ServerId: 1
       # 定时器大小
@@ -50,12 +51,6 @@ ServiceConf:
       # 消息队列大小
       MailBoxSize: 1000
       # 协程数量
-      GoroutineNum: 1
-    - ServiceName: Service2
-      Type: test
-      ServerId: 1
-      TimerSize: 100
-      MailBoxSize: 1000
       GoroutineNum: 1
 
 # 日志配置

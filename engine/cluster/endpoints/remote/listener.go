@@ -29,6 +29,7 @@ func NewRPCListener(cliFactory inf.IRpcSenderFactory) *RPCListener {
 // TODO 处理ReqId重复发送的问题
 
 func (rm *RPCListener) RPCCall(_ context.Context, req *actor.Message, _ *dto.RPCResponse) error {
+	//log.SysLogger.Debugf("rpc call: %+v", req)
 	if req.Reply {
 		// 回复
 		// 需要回复的信息都会加入monitor中,找到对应的信封
@@ -48,8 +49,12 @@ func (rm *RPCListener) RPCCall(_ context.Context, req *actor.Message, _ *dto.RPC
 			}
 			envelope.SetReply()
 			envelope.SetRequest(nil)
+			envelope.SetNeedResponse(false) // 已经是回复了
 			envelope.SetResponse(response)
 			envelope.SetErrStr(req.Err)
+
+			//log.SysLogger.Debugf("call back envelope: %+v", envelope)
+
 			if envelope.NeedCallback() {
 				return sender.PushRequest(envelope)
 			} else {
@@ -59,8 +64,7 @@ func (rm *RPCListener) RPCCall(_ context.Context, req *actor.Message, _ *dto.RPC
 			}
 		} else {
 			// 已经超时,丢弃返回
-			log.SysLogger.Warnf("rpc call timeout, future not found: %+v", req)
-			msgenvelope.ReleaseMsgEnvelope(envelope)
+			log.SysLogger.Warnf("rpc call timeout, envelope not found: %s", req.String())
 			return nil
 		}
 	} else {
@@ -70,18 +74,21 @@ func (rm *RPCListener) RPCCall(_ context.Context, req *actor.Message, _ *dto.RPC
 			return err
 		}
 
-		mt := monitor.GetRpcMonitor()
-
 		// 构建消息
 		envelope := msgenvelope.NewMsgEnvelope()
+		envelope.SetHeaders(req.MessageHeader)
 		envelope.SetMethod(req.Method)
 		envelope.SetReceiver(req.Receiver)
-		envelope.SetSenderClient(rm.cliFactory.GetClient(req.Sender.GetServiceUid()))
+		if req.NeedResp {
+			// 需要回复的才设置sender
+			envelope.SetSender(req.Sender)
+			envelope.SetSenderClient(rm.cliFactory.GetClient(req.Sender))
+		}
 		envelope.SetRequest(request)
 		envelope.SetResponse(nil)
-		envelope.SetReqId(mt.GenSeq())
+		envelope.SetReqId(req.ReqId)
 		envelope.SetNeedResponse(req.NeedResp)
 
-		return rm.cliFactory.GetClient(req.Receiver.GetServiceUid()).SendRequestAndRelease(envelope)
+		return rm.cliFactory.GetClient(req.Receiver).SendRequest(envelope)
 	}
 }

@@ -19,6 +19,13 @@ import (
 	"unicode/utf8"
 )
 
+var apiPreFix = []string{
+	"Api", "API",
+}
+var rpcPreFix = []string{
+	"Rpc", "RPC",
+}
+
 type MethodInfo struct {
 	Method   reflect.Method
 	In       []reflect.Type
@@ -56,6 +63,16 @@ func isExported(name string) bool {
 	return unicode.IsUpper(r)
 }
 
+func hasPrefix(str string, ls []string) bool {
+	for _, s := range ls {
+		if strings.HasPrefix(str, s) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (h *Handler) isExportedOrBuiltinType(t reflect.Type) bool {
 	for t.Kind() == reflect.Ptr {
 		t = t.Elem()
@@ -67,14 +84,14 @@ func (h *Handler) isExportedOrBuiltinType(t reflect.Type) bool {
 
 func (h *Handler) suitableMethods(method reflect.Method) error {
 	// 只有以API或者rpc开头的方法才注册
-	if !strings.HasPrefix(method.Name, "API") && !strings.HasPrefix(method.Name, "API_") {
-		if !strings.HasPrefix(method.Name, "RPC") && !strings.HasPrefix(method.Name, "RPC_") {
+	if !hasPrefix(method.Name, apiPreFix) {
+		if !hasPrefix(method.Name, rpcPreFix) {
 			// 不是API或者RPC开头的方法,直接返回
 			return nil
 		}
 
 		if !h.isPublic {
-			// 走到这说明有rpc方法
+			// 走到这说明有rpc方法,那么service即为公开服务,可以被远程调用
 			h.isPublic = true
 		}
 	}
@@ -90,7 +107,8 @@ func (h *Handler) suitableMethods(method reflect.Method) error {
 		in = append(in, method.Type.In(i))
 	}
 
-	// 最多两个返回值,一个结果,一个错误
+	// TODO 如果是rpc方法,实际上最多只有一个入参和一个返回值(除去错误),看这里要不要校验一下,防止写错
+
 	var outs []reflect.Type
 
 	// 计算除了error,还有几个返回值
@@ -240,7 +258,6 @@ func (h *Handler) doResponse(envelope inf.IEnvelope) {
 		// 发送回复信息
 		if err := envelope.GetSenderClient().SendResponse(envelope); err != nil {
 			log.SysLogger.Errorf("service[%s] send response failed: %v", h.GetName(), err)
-			msgenvelope.ReleaseMsgEnvelope(envelope)
 		}
 	} else {
 		// 不需要回复,释放资源

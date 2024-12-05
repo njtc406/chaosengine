@@ -10,7 +10,6 @@ import (
 	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/monitor"
-	"github.com/njtc406/chaosengine/engine/utils/log"
 )
 
 // localSender 本地服务的Client
@@ -44,11 +43,9 @@ func (lc *localSender) SendResponse(envelope inf.IEnvelope) error {
 	}
 
 	if envelope.NeedCallback() {
-		log.SysLogger.Debugf("--------------<<<<<<<<<<<<< response need call back")
 		// 本地调用的回复消息,直接发送到对应service的邮箱处理
 		return lc.PushRequest(envelope)
 	} else {
-		log.SysLogger.Debugf("---------------<<<<<<<<<<<< response not need call back")
 		// 同步调用,直接设置调用结束
 		envelope.Done()
 	}

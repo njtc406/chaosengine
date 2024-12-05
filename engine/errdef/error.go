@@ -31,4 +31,11 @@ var (
 	DiscoveryConfNotFound   = errors.New("discovery conf not found")                  // 配置中心未找到
 	ETCDNotInit             = errors.New("etcd not init")                             // etcd 未初始化
 	HandleMessagePanic      = errors.New("handle message panic")                      // 处理消息时发生 panic
+	CallbacksIsEmpty        = errors.New("callbacks is empty")                        // 回调函数为空
 )
+
+//type RpcErr string
+//
+//func (re RpcErr) Error() string {
+//	return fmt.Sprintf("rpc error: %s", string(re))
+//}

@@ -78,9 +78,9 @@ func (em *EndpointManager) updateServiceInfo(e inf.IEvent) {
 			log.SysLogger.Errorf("unmarshal pid error: %v", err)
 			return
 		}
-		log.SysLogger.Debugf("remote nodeuid:%s   local:%s", pid.GetNodeUid(), em.remote.GetNodeUid())
+
 		if pid.GetNodeUid() == em.remote.GetNodeUid() {
-			log.SysLogger.Debugf("local service: %s, pid: %+v", pid.String(), &pid)
+			log.SysLogger.Debugf("endpointmgr ignore -> remote: %s local: %s  pid:%s", pid.GetNodeUid(), em.remote.GetNodeUid(), pid.String())
 			// 本地服务,忽略
 			return
 		}
@@ -142,6 +142,12 @@ func (em *EndpointManager) RemoveService(pid *actor.PID) {
 	em.repository.Remove(pid)
 }
 
-func (em *EndpointManager) GetClient(serviceUid string) inf.IRpcSender {
-	return em.repository.SelectByServiceUid(serviceUid)
+func (em *EndpointManager) GetClient(pid *actor.PID) inf.IRpcSender {
+	cli := em.repository.SelectByServiceUid(pid.GetServiceUid())
+	if cli == nil {
+		// 只有一种情况下可能是空的,就是调用者是私有服务,那么此时就单独创建一个
+		// TODO 这里考虑将私有服务的client加入到一个临时列表中,防止每次都创建,然后加入一个过期机制,多久没有调用就删除
+		return client.NewSender(pid.GetRpcType())(pid, nil)
+	}
+	return cli
 }
