@@ -24,26 +24,26 @@ type Service1 struct {
 func (s *Service1) OnInit() error {
 	// api test demo
 
-	//s.AfterFunc(time.Second, func(timer timer.ITimer) {
-	//	//startTime := timelib.GetTime()
-	//	// 调用Service2.APITest2
-	//	if err := s.SelectSameServer("", "Service2").Call("APITest2", nil, nil); err != nil {
-	//		log.SysLogger.Errorf("call Service2.APITest2 failed, err:%v", err)
-	//	}
-	//	if err := s.SelectSameServer("", "Service2").Send("APITest2", nil); err != nil {
-	//		log.SysLogger.Errorf("call Service2.APITest2 failed, err:%v", err)
-	//	}
-	//	//log.SysLogger.Debugf("call Service2.APITest2 cost:%d", timelib.Since(startTime).Microseconds())
-	//})
-	//s.AfterFunc(time.Second*2, func(iTimer timer.ITimer) {
-	//	// 调用Service2.APITest2 带返回参数
-	//	var out int
-	//	if err := s.SelectSameServer("", "Service2").Call("APISum", []interface{}{1, 2}, &out); err != nil {
-	//		log.SysLogger.Errorf("call Service2.APISum failed, err:%v", err)
-	//	}
-	//
-	//	log.SysLogger.Debugf("call Service2.APISum out:%d", out)
-	//})
+	s.AfterFunc(time.Second, func(timer timer.ITimer) {
+		//startTime := timelib.GetTime()
+		// 调用Service2.APITest2
+		if err := s.SelectSameServer("", "Service2").Call("APITest2", nil, nil); err != nil {
+			log.SysLogger.Errorf("call Service2.APITest2 failed, err:%v", err)
+		}
+		if err := s.SelectSameServer("", "Service2").Send("APITest2", nil); err != nil {
+			log.SysLogger.Errorf("call Service2.APITest2 failed, err:%v", err)
+		}
+		//log.SysLogger.Debugf("call Service2.APITest2 cost:%d", timelib.Since(startTime).Microseconds())
+	})
+	s.AfterFunc(time.Second*2, func(iTimer timer.ITimer) {
+		// 调用Service2.APITest2 带返回参数
+		var out int
+		if err := s.SelectSameServer("", "Service2").Call("APISum", []interface{}{1, 2}, &out); err != nil {
+			log.SysLogger.Errorf("call Service2.APISum failed, err:%v", err)
+		}
+
+		log.SysLogger.Debugf("call Service2.APISum out:%d", out)
+	})
 	//
 	//s.AfterFunc(time.Second*3, func(iTimer timer.ITimer) {
 	//	// 调用Service2.APITest2 不同类型入参
@@ -127,6 +127,11 @@ func (s *Service1) OnInit() error {
 	//s.AfterFunc(time.Second*1, func(iTimer timer.ITimer) {
 	//	s.SelectSameServerByServiceType("test1", "").Cast("RPCTest2", nil)
 	//})
+
+	// other test
+	s.AfterFunc(time.Second*7, func(iTimer timer.ITimer) {
+		// TODO 测试各种类型的筛选器
+	})
 
 	return nil
 }

@@ -37,121 +37,36 @@
 3. **远程调用**
     - 基于 `rpcx` 实现跨节点远程调用。
 
-### 当前实现
+### 版本说明:
+目前为第一版,后续慢慢补充
+````
+已经完成的内容:
+1. 节点、服务、模块封装
+2. 集群管理
+3. 配置管理
+4. 定时器
+5. 日志(支持自定义日志时间粒度和自动切分粒度的配置,过期自动删除日志的配置)
+6. pprof
+````
 
-- 节点内和跨节点服务的调用功能。
-- 基于 `etcd` 的服务发现机制。
-- 配置可以远程,可以本地(这个是用来支持k8s的,但是目前还不是很完善)
+### 使用说明
+````
+详细使用,请查看example文件夹的使用示例
+````
 ---
 
 ### 可使用的环境变量
 ````
-CHAOS_CONF_PATH = "./configs"                               // 本地配置文件路径(会优先使用环境变量)
-CHAOS_ETCD_CONF_ENDPOINTS = "127.0.0.1:2379,127.0.0.1:2379" // etcd地址
-CHAOS_ETCD_DIAL_TIMEOUT = 5s                                // 连接超时时间
-CHAOS_ETCD_USERNAME = ""                                    // 用户名
-CHAOS_ETCD_PASSWORD = ""                                    // 密码
-CHAOS_ETCD_CONF_BASE_PATH = "/chaos/node/config/node.yaml"  // 配置文件路径
+TODO
 ````
 ---
 
-## 使用说明
-熟悉origin的童鞋应该可以直接上手,这部分几乎没什么变化,origin的大佬已经做的很简化了
-### 1. 启动一个节点
-
-```go
-package main
-import "github.com/njtc406/chaosengine/engine/core/node"
-
-var version = "1.0"         // 版本号
-var configPath = "./configs/login" // 配置路径
-
-func main() {
-    // 可设置启动前钩子，例如日志初始化
-    // node.SetStartHook(func() { ... })
-
-    // 启动节点
-    node.Start(version, configPath)
-}
-```
-
-### 2. 增加一个服务
-
-```go
-package main
-import (
-    "github.com/njtc406/chaosengine/engine/core"
-    "github.com/njtc406/chaosengine/engine/core/node"
-    nodeConfig "github.com/njtc406/chaosengine/engine/core/node/config"
-)
-
-func init() {
-    // 注册服务
-    node.Setup(&MyService{})
-
-    // 注册配置
-    nodeConfig.RegisterConf(&nodeConfig.ConfInfo{
-        ServiceName: "MyService",
-        ConfName:    "myServiceConf",
-        ConfPath:    "",
-        ConfType:    "yaml",
-        Cfg:         &config{},
-    })
-}
-
-type config struct {
-    a int
-    b string
-}
-
-type MyService struct {
-    core.Service
-    data int
-}
-
-func (s *MyService) OnInit() error {
-    return nil
-}
-
-func (s *MyService) OnStart() error {
-    return nil
-}
-
-func (s *MyService) OnRelease() {}
-```
-
-3. 增加一个模块
-```go
-package main
-import (
-    "github.com/njtc406/chaosengine/engine/core"
-)
-
-type MyModule struct {
-    core.Module
-}
-
-func (m *MyModule) OnInit() error {
-    return nil
-}
-
-func (m *MyModule) OnRelease() {}
-
-func (s *MyService) OnInit() error {
-    module := &MyModule{}
-    // 添加模块到服务
-    moduleID, err := s.AddModule(module)
-    if err != nil {
-        return err
-    }
-    fmt.Printf("Module ID: %d\n", moduleID)
-    return nil
-}
-
-func (s *MyService) OnRelease() {
-    s.ReleaseAllChildModule()
-}
-```
-
-## 还未完成的功能:
-1. 远程配置目前只能使用etcd, 后续考虑做成接口方便扩展
+### 后续规划:
+````
+1. 集群认证机制
+2. 服务健康监控
+3. 服务的限流策略
+4. 更加模块化的设计,将大部分的底层内容做成插件,可以自由扩展和配置使用
+5. 增加服务热更新的功能
+6. 日志的异步模式,包括输出扩展(自定义输出器,目前实际是有的,只是没有暴露出来,也没有办法动态更新)
+````
