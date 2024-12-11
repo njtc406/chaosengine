@@ -41,7 +41,8 @@ ServiceConf:
   RemoteConfPath: ""
   StartServices:
     # 服务名称
-    - ServiceName: Service4
+    - ServiceId: 2
+      ServiceName: Service3
       # 服务类型
       Type: test1
       # 服务器ID

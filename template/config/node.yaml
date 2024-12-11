@@ -42,8 +42,10 @@ ServiceConf:
   RemoteConfPath: ""
   # 如果配置的远程,那么这里获取的文件就是 /server/service/1/config/services
   StartServices:
-    # 服务名称
-    - ServiceName: DBService
+      # 服务ID(如果是相同serverId下只有一个的可以为空)
+    - ServiceId:
+      # 服务名称
+      ServiceName: DBService
       # 服务类型
       Type: db
       # 服务器ID

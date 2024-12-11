@@ -90,6 +90,7 @@ func (s *Service) Init(svc interface{}, serviceInitConf *config.ServiceInitConf,
 	s.fixConf(serviceInitConf)
 	log.SysLogger.Debugf("service[%s] init conf: %+v", s.GetName(), serviceInitConf)
 	// 初始化服务数据
+	s.id = serviceInitConf.ServiceId
 	s.serviceType = serviceInitConf.Type
 	s.rpcType = serviceInitConf.RpcType
 	s.serverId = serviceInitConf.ServerId

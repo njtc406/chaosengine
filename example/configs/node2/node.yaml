@@ -40,8 +40,10 @@ ServiceConf:
   OpenRemote: false
   RemoteConfPath: ""
   StartServices:
-    # 服务名称
-    - ServiceName: Service3
+      # 服务ID
+    - ServiceId: 1
+      # 服务名称
+      ServiceName: Service3
       # 服务类型
       Type: test1
       # 服务器ID
