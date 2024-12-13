@@ -8,7 +8,6 @@ package repository
 import (
 	"github.com/njtc406/chaosengine/engine/actor"
 	"github.com/njtc406/chaosengine/engine/inf"
-	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/njtc406/chaosengine/engine/utils/timelib"
 	"sync"
 	"time"
@@ -85,7 +84,7 @@ func (r *Repository) AddTmp(sender inf.IRpcSender) inf.IRpcSender {
 func (r *Repository) Add(client inf.IRpcSender) {
 	_, ok := r.mapPID.LoadOrStore(client.GetPid().GetServiceUid(), client)
 	if ok {
-		log.SysLogger.Debugf("service already exists: %s", client.GetPid().GetServiceUid())
+		//log.SysLogger.Debugf("service already exists: %s", client.GetPid().GetServiceUid())
 		r.mapPID.Store(client.GetPid().GetServiceUid(), client) // 已经有了,只需要更新
 		return
 	}

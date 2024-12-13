@@ -2,6 +2,7 @@ package timer
 
 import (
 	"fmt"
+	"github.com/njtc406/chaosengine/engine/dto"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/njtc406/chaosengine/engine/utils/pool"
 	"reflect"
@@ -11,11 +12,14 @@ import (
 	"time"
 )
 
+// TODO 后面看看要不要换成时间轮,不然任务量大的时候heap可能会比较慢
+
 type OnCloseTimer func(timer ITimer)
 type OnAddTimer func(timer ITimer)
 
 // Timer 定时器
 type Timer struct {
+	dto.DataRef
 	Id             uint64
 	cancelled      int32         //是否关闭
 	C              chan ITimer   //定时器管道
@@ -181,22 +185,6 @@ func (t *Timer) Reset() {
 	*t = emptyTimer
 }
 
-func (t *Timer) IsRef() bool {
-	return t.ref
-}
-
-func (t *Timer) Ref() {
-	t.ref = true
-}
-
-func (t *Timer) UnRef() {
-	t.ref = false
-}
-
-func (c *Cron) Reset() {
-	c.Timer.Reset()
-}
-
 func (c *Cron) Do() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -238,16 +226,8 @@ func (c *Cron) Do() {
 	}
 }
 
-func (c *Cron) IsRef() bool {
-	return c.ref
-}
-
-func (c *Cron) Ref() {
-	c.ref = true
-}
-
-func (c *Cron) UnRef() {
-	c.ref = false
+func (c *Cron) Reset() {
+	c.Timer.Reset()
 }
 
 func (c *Ticker) Do() {
@@ -285,18 +265,6 @@ func (c *Ticker) Do() {
 
 func (c *Ticker) Reset() {
 	c.Timer.Reset()
-}
-
-func (c *Ticker) IsRef() bool {
-	return c.ref
-}
-
-func (c *Ticker) Ref() {
-	c.ref = true
-}
-
-func (c *Ticker) UnRef() {
-	c.ref = false
 }
 
 func NewDispatcher(l int) *Dispatcher {
