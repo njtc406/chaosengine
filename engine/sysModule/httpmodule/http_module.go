@@ -43,6 +43,11 @@ type HttpModule struct {
 	// 还需要一个服务通讯接口(这个接口提供几个固定方法,可能其中一个方法就是查询可以提供给其他服务调用的api之类的)
 }
 
+type CAFile struct {
+	CertFile string
+	KeyFile  string
+}
+
 // Conf 配置信息
 type Conf struct {
 	// 服务监听端口
@@ -63,6 +68,8 @@ type Conf struct {
 	Auth bool
 	// basic auth认证用户名
 	Account map[string]string
+	// 证书文件
+	CAFile *CAFile
 }
 
 func (c *Conf) GetHttpDir() string {
@@ -165,8 +172,14 @@ func (hs *HttpModule) run() {
 	}
 
 	hs.logger.Infof("listen %s", hs.server.Addr)
-	if err := hs.server.ListenAndServe(); err != nil {
-		hs.logger.Error(err)
+	if hs.conf.CAFile != nil {
+		if err := hs.server.ListenAndServeTLS(hs.conf.CAFile.CertFile, hs.conf.CAFile.KeyFile); err != nil {
+			hs.logger.Error(err)
+		}
+	} else {
+		if err := hs.server.ListenAndServe(); err != nil {
+			hs.logger.Error(err)
+		}
 	}
 }
 

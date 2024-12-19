@@ -7,29 +7,29 @@ package client
 
 import (
 	"context"
-	"github.com/njtc406/chaosengine/engine/errdef"
-	"github.com/njtc406/chaosengine/engine/msgenvelope"
-	"github.com/smallnest/rpcx/protocol"
-	"github.com/smallnest/rpcx/share"
 	"time"
 
+	"github.com/njtc406/chaosengine/engine/errdef"
 	"github.com/njtc406/chaosengine/engine/inf"
+	"github.com/njtc406/chaosengine/engine/msgenvelope"
 	"github.com/njtc406/chaosengine/engine/utils/log"
 	"github.com/smallnest/rpcx/client"
+	"github.com/smallnest/rpcx/protocol"
+	"github.com/smallnest/rpcx/share"
 )
 
-// 远程服务的Client
+// 使用rpcx框架点对点直接调用, 这个相对于nats有一个优势, 就是可以知道消息是否被对方接收
 
 type rpcxSender struct {
 	inf.IRpcSender
 	rpcClient client.XClient
 }
 
-func newRemoteClient(sender inf.IRpcSender) inf.IRpcSenderHandler {
+func newRpcxClient(sender inf.IRpcSender) inf.IRpcSenderHandler {
 	pid := sender.GetPid()
 	d, _ := client.NewPeer2PeerDiscovery("tcp@"+pid.GetAddress(), "")
 	// 如果调用失败,会自动重试3次
-	rpcClient := client.NewXClient("RpcListener", client.Failtry, client.RandomSelect, d, client.Option{
+	rpcClient := client.NewXClient("RpcxListener", client.Failtry, client.RandomSelect, d, client.Option{
 		Retries:             3, // 重试3次
 		RPCPath:             share.DefaultRPCPath,
 		ConnectTimeout:      time.Second,           // 连接超时
@@ -66,7 +66,11 @@ func (rc *rpcxSender) send(envelope inf.IEnvelope) error {
 		return errdef.RPCHadClosed
 	}
 	// 这里仅仅代表消息发送成功
-	ctx, cancel := context.WithTimeout(context.Background(), envelope.GetTimeout())
+	timeout := envelope.GetTimeout()
+	if envelope.GetTimeout() == 0 {
+		timeout = time.Millisecond * 500
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	// 构建发送消息

@@ -15,8 +15,9 @@ import (
 type HandlerCreator func(sender inf.IRpcSender) inf.IRpcSenderHandler
 
 var handlerMap = map[string]HandlerCreator{
-	def.DefaultRpcTypeLocal: newLClient,
-	def.DefaultRpcTypeRpcx:  newRemoteClient,
+	def.RpcTypeLocal: newLClient,
+	def.RpcTypeRpcx:  newRpcxClient,
+	def.RpcTypeGrpc:  newGrpcClient,
 }
 
 func Register(tp string, creator HandlerCreator) {

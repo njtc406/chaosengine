@@ -24,26 +24,26 @@ type Service1 struct {
 func (s *Service1) OnInit() error {
 	// api test demo
 
-	s.AfterFunc(time.Second, func(timer timer.ITimer) {
-		//startTime := timelib.GetTime()
-		// 调用Service2.APITest2
-		if err := s.SelectSameServer("", "Service2").Call("APITest2", nil, nil); err != nil {
-			log.SysLogger.Errorf("call Service2.APITest2 failed, err:%v", err)
-		}
-		if err := s.SelectSameServer("", "Service2").Send("APITest2", nil); err != nil {
-			log.SysLogger.Errorf("call Service2.APITest2 failed, err:%v", err)
-		}
-		//log.SysLogger.Debugf("call Service2.APITest2 cost:%d", timelib.Since(startTime).Microseconds())
-	})
-	s.AfterFunc(time.Second*2, func(iTimer timer.ITimer) {
-		// 调用Service2.APITest2 带返回参数
-		var out int
-		if err := s.SelectSameServer("", "Service2").Call("APISum", []interface{}{1, 2}, &out); err != nil {
-			log.SysLogger.Errorf("call Service2.APISum failed, err:%v", err)
-		}
-
-		log.SysLogger.Debugf("call Service2.APISum out:%d", out)
-	})
+	//s.AfterFunc(time.Second, func(timer timer.ITimer) {
+	//	//startTime := timelib.GetTime()
+	//	// 调用Service2.APITest2
+	//	if err := s.SelectSameServer("", "Service2").Call("APITest2", nil, nil); err != nil {
+	//		log.SysLogger.Errorf("call Service2.APITest2 failed, err:%v", err)
+	//	}
+	//	if err := s.SelectSameServer("", "Service2").Send("APITest2", nil); err != nil {
+	//		log.SysLogger.Errorf("call Service2.APITest2 failed, err:%v", err)
+	//	}
+	//	//log.SysLogger.Debugf("call Service2.APITest2 cost:%d", timelib.Since(startTime).Microseconds())
+	//})
+	//s.AfterFunc(time.Second*2, func(iTimer timer.ITimer) {
+	//	// 调用Service2.APITest2 带返回参数
+	//	var out int
+	//	if err := s.SelectSameServer("", "Service2").Call("APISum", []interface{}{1, 2}, &out); err != nil {
+	//		log.SysLogger.Errorf("call Service2.APISum failed, err:%v", err)
+	//	}
+	//
+	//	log.SysLogger.Debugf("call Service2.APISum out:%d", out)
+	//})
 	//
 	//s.AfterFunc(time.Second*3, func(iTimer timer.ITimer) {
 	//	// 调用Service2.APITest2 不同类型入参
@@ -82,17 +82,17 @@ func (s *Service1) OnInit() error {
 
 	// rpc test demo
 
-	s.AfterFunc(time.Second*2, func(iTimer timer.ITimer) {
-		if err := s.SelectSameServer("", "Service3").Call("RPCTest2", nil, nil); err != nil {
-			log.SysLogger.Errorf("call Service3.RPCTest2 failed, err:%v", err)
-		}
-		if err := s.SelectSameServer("", "Service3").CallWithTimeout("RPCTest2", time.Second*5, nil, nil); err != nil {
-			log.SysLogger.Errorf("call Service3.RPCTest2 failed, err:%v", err)
-		}
-		if err := s.SelectSameServer("", "Service3").Send("RPCTest2", nil); err != nil {
-			log.SysLogger.Errorf("call Service3.RPCTest2 failed, err:%v", err)
-		}
-	})
+	//s.AfterFunc(time.Second*2, func(iTimer timer.ITimer) {
+	//	if err := s.SelectSameServer("", "Service3").Call("RPCTest2", nil, nil); err != nil {
+	//		log.SysLogger.Errorf("call Service3.RPCTest2 failed, err:%v", err)
+	//	}
+	//	if err := s.SelectSameServer("", "Service3").CallWithTimeout("RPCTest2", time.Second*5, nil, nil); err != nil {
+	//		log.SysLogger.Errorf("call Service3.RPCTest2 failed, err:%v", err)
+	//	}
+	//	if err := s.SelectSameServer("", "Service3").Send("RPCTest2", nil); err != nil {
+	//		log.SysLogger.Errorf("call Service3.RPCTest2 failed, err:%v", err)
+	//	}
+	//})
 	//s.AfterFunc(time.Second*2, func(iTimer timer.ITimer) {
 	//	out := &msg.Msg_Test_Resp{}
 	//	if err := s.SelectSameServer("", "Service3").Call("RPCSum", &msg.Msg_Test_Req{A: 1, B: 2}, out); err != nil {
@@ -124,19 +124,21 @@ func (s *Service1) OnInit() error {
 	//})
 
 	// cast test
-	//s.AfterFunc(time.Second*1, func(iTimer timer.ITimer) {
-	//	s.SelectSameServerByServiceType("test1", "").Cast("RPCTest2", nil)
-	//})
+	s.AfterFunc(time.Second*1, func(iTimer timer.ITimer) {
+		s.SelectSameServerByServiceType("test", "Service3").Cast("RPCTest2", nil)
+	})
 
 	// other test
-	s.AfterFunc(time.Second*7, func(iTimer timer.ITimer) {
-		// TODO 测试各种类型的筛选器
-	})
+	//s.AfterFunc(time.Second*7, func(iTimer timer.ITimer) {
+	//	// TODO 测试各种类型的筛选器
+	//})
 
 	return nil
 }
 
 func (s *Service1) OnStart() error {
+	// 测试在onstart阶段call其他服务
+	//s.callTest()
 	return nil
 }
 
@@ -148,15 +150,37 @@ func (s *Service1) APITest1() {
 	log.SysLogger.Debugf("call %s func APITest1", s.GetName())
 }
 
+//func (s *Service1) callTest() {
+//	var out int
+//	if err := s.Select(1, "", "Service2").Call("APISum", []interface{}{1, 2}, &out); err != nil {
+//		log.SysLogger.Errorf("call Service2.APISum failed, err:%v", err)
+//	}
+//
+//	log.SysLogger.Debugf("call Service2.APISum out:%d", out)
+//}
+
 type Service2 struct {
 	core.Service
 }
 
 func (s *Service2) OnInit() error {
+	s.OpenConcurrentByNumCPU(1)
 	return nil
 }
 
 func (s *Service2) OnStart() error {
+	//s.AsyncDo(func() bool {
+	//	time.Sleep(time.Second)
+	//	// 创建service1
+	//	svc1 := &Service1{}
+	//	svc1.OnSetup(svc1)
+	//	svc1.Init(svc1, nil, nil)
+	//	svc1.OnInit()
+	//	if err := svc1.Start(); err != nil {
+	//		log.SysLogger.Errorf("start Service1 failed, err:%v", err)
+	//	}
+	//	return true
+	//}, nil)
 	return nil
 }
 
@@ -199,11 +223,11 @@ func (s *Service2) APICallback() {
 }
 
 func init() {
-	services.SetService("Service1", func() inf.IService {
-		return &Service1{}
-	})
 	services.SetService("Service2", func() inf.IService {
 		return &Service2{}
+	})
+	services.SetService("Service1", func() inf.IService {
+		return &Service1{}
 	})
 }
 

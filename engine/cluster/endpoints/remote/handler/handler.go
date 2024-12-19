@@ -1,14 +1,12 @@
-// Package remote
+// Package handler
 // @Title  title
 // @Description  desc
-// @Author  yr  2024/11/8
-// @Update  yr  2024/11/8
-package remote
+// @Author  yr  2024/12/18
+// @Update  yr  2024/12/18
+package handler
 
 import (
-	"context"
 	"github.com/njtc406/chaosengine/engine/actor"
-	"github.com/njtc406/chaosengine/engine/dto"
 	"github.com/njtc406/chaosengine/engine/inf"
 	"github.com/njtc406/chaosengine/engine/monitor"
 	"github.com/njtc406/chaosengine/engine/msgenvelope"
@@ -16,20 +14,9 @@ import (
 	"github.com/njtc406/chaosengine/engine/utils/serializer"
 )
 
-type RPCListener struct {
-	cliFactory inf.IRpcSenderFactory
-}
-
-func NewRPCListener(cliFactory inf.IRpcSenderFactory) *RPCListener {
-	return &RPCListener{
-		cliFactory: cliFactory,
-	}
-}
-
 // TODO 处理ReqId重复发送的问题
 
-func (rm *RPCListener) RPCCall(_ context.Context, req *actor.Message, _ *dto.RPCResponse) error {
-	log.SysLogger.Debugf("rpc call: %+v", req)
+func RpcMessageHandler(sf inf.IRpcSenderFactory, req *actor.Message) error {
 	if req.Reply {
 		// 回复
 		// 需要回复的信息都会加入monitor中,找到对应的信封数据
@@ -82,13 +69,13 @@ func (rm *RPCListener) RPCCall(_ context.Context, req *actor.Message, _ *dto.RPC
 		if req.NeedResp {
 			// 需要回复的才设置sender
 			envelope.SetSenderPid(req.SenderPid)
-			envelope.SetSender(rm.cliFactory.GetSender(req.SenderPid))
+			envelope.SetSender(sf.GetSender(req.SenderPid))
 		}
 		envelope.SetRequest(request)
 		envelope.SetResponse(nil)
 		envelope.SetReqId(req.ReqId)
 		envelope.SetNeedResponse(req.NeedResp)
 
-		return rm.cliFactory.GetSender(req.ReceiverPid).SendRequest(envelope)
+		return sf.GetSender(req.ReceiverPid).SendRequest(envelope)
 	}
 }

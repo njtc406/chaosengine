@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+// TODO 这部分独立出来做成工具,包括node的配置,都注册进来,这样可以支持多种格式配置
+
 var (
 	runtimeViper = viper.New()
 	clusterViper = viper.New()
@@ -27,8 +29,6 @@ const startServiceConfName = "services.yaml"
 // 2. 根据服务配置决定使用本地或者远程
 // 3. 读取服务配置
 // 4. 节点会根据服务配置启动对应服务
-
-// TODO 监听配置变化
 
 func Init(confPath string) {
 	fmt.Println("=============开始解析配置===================")
@@ -133,11 +133,13 @@ func setDefaultValues() {
 			UserName:    "",
 			Password:    "",
 		},
-		RPCServer: &RPCServer{
-			Addr:   "0.0.0.0:6688",
-			Protoc: "tcp",
+		RPCServers: []*RPCServer{
+			{
+				Addr:   "0.0.0.0:6688",
+				Protoc: "tcp",
+				Type:   def.RpcTypeGrpc,
+			},
 		},
-		RemoteType:     def.DefaultRpcTypeRpcx,
 		DiscoveryType:  def.DiscoveryConfUseLocal,
 		RemoteConfPath: "",
 	})

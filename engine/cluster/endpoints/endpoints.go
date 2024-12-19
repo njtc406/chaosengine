@@ -6,6 +6,7 @@
 package endpoints
 
 import (
+	"github.com/google/uuid"
 	"github.com/njtc406/chaosengine/engine/actor"
 	"github.com/njtc406/chaosengine/engine/cluster/endpoints/client"
 	"github.com/njtc406/chaosengine/engine/cluster/endpoints/remote"
@@ -25,9 +26,10 @@ type EndpointManager struct {
 	inf.IEventProcessor
 	inf.IEventHandler
 
-	remote     inf.IRemoteServer      // 通讯器(这里之后可以根据类型扩展为多个)
-	stopped    bool                   // 是否已停止
-	repository *repository.Repository // 服务存储仓库
+	nodeUid    string
+	remotes    map[string]*remote.Remote // 远程服务监听器
+	stopped    bool                      // 是否已停止
+	repository *repository.Repository    // 服务存储仓库
 }
 
 func GetEndpointManager() *EndpointManager {
@@ -35,9 +37,11 @@ func GetEndpointManager() *EndpointManager {
 }
 
 func (em *EndpointManager) Init(eventProcessor inf.IEventProcessor) *EndpointManager {
-	em.remote = remote.GetRemote(def.DefaultRpcTypeRpcx)
-	log.SysLogger.Debugf("cluster rpc server config: %+v", config.Conf.ClusterConf.RPCServer)
-	em.remote.Init(config.Conf.ClusterConf.RPCServer, em)
+	em.nodeUid = uuid.NewString()
+	em.remotes = make(map[string]*remote.Remote)
+	for _, cfg := range config.Conf.ClusterConf.RPCServers {
+		em.remotes[cfg.Type] = remote.NewRemote().Init(cfg, em)
+	}
 
 	em.IEventProcessor = eventProcessor
 
@@ -54,9 +58,10 @@ func (em *EndpointManager) Init(eventProcessor inf.IEventProcessor) *EndpointMan
 func (em *EndpointManager) Start() {
 	em.repository.Start()
 	// 启动rpc监听服务器
-	if err := em.remote.Serve(); err != nil {
-		log.SysLogger.Fatalf("start rpc server error: %v", err)
+	for _, rt := range em.remotes {
+		rt.Serve()
 	}
+
 	// 新增、修改服务事件
 	em.IEventProcessor.RegEventReceiverFunc(event.SysEventETCDPut, em.IEventHandler, em.updateServiceInfo)
 	// 删除服务事件
@@ -65,7 +70,9 @@ func (em *EndpointManager) Start() {
 
 func (em *EndpointManager) Stop() {
 	em.stopped = true
-	em.remote.Close()
+	for _, rt := range em.remotes {
+		rt.Close()
+	}
 	em.repository.Stop()
 }
 
@@ -81,13 +88,13 @@ func (em *EndpointManager) updateServiceInfo(e inf.IEvent) {
 			return
 		}
 
-		if pid.GetNodeUid() == em.remote.GetNodeUid() {
-			log.SysLogger.Debugf("endpointmgr ignore -> remote: %s local: %s  pid:%s", pid.GetNodeUid(), em.remote.GetNodeUid(), pid.String())
+		if pid.GetNodeUid() == em.nodeUid {
+			log.SysLogger.Debugf("endpointmgr ignore -> remote: %s local: %s  pid:%s", pid.GetNodeUid(), em.nodeUid, pid.String())
 			// 本地服务,忽略
 			return
 		}
 
-		em.repository.Add(client.NewSender(def.DefaultRpcTypeRpcx, &pid, nil))
+		em.repository.Add(client.NewSender(pid.GetRpcType(), &pid, nil))
 	}
 }
 
@@ -107,25 +114,24 @@ func (em *EndpointManager) removeServiceInfo(e inf.IEvent) {
 }
 
 // AddService 添加本地服务到服务发现中
-func (em *EndpointManager) AddService(serverId int32, serviceId, serviceType, serviceName string, version int64, rpcType string, rpcHandler inf.IRpcHandler) *actor.PID {
-	pid := actor.NewPID(em.remote.GetAddress(), em.remote.GetNodeUid(), serverId, serviceId, serviceType, serviceName, version, rpcType)
+func (em *EndpointManager) AddService(pid *actor.PID, rpcHandler inf.IRpcHandler) {
 	log.SysLogger.Debugf("add local service: %s, pid: %v", pid.String(), rpcHandler)
-	em.repository.Add(client.NewSender(def.DefaultRpcTypeLocal, pid, rpcHandler))
+	em.repository.Add(client.NewSender(def.RpcTypeLocal, pid, rpcHandler))
 
-	// 私有服务不发布到etcd
+	// 私有服务不发布
 	if rpcHandler.IsPrivate() {
-		return pid
+		return
 	}
 
-	log.SysLogger.Debugf("add service to etcd ,pid: %v", pid.String())
+	log.SysLogger.Debugf("add service to cluster ,pid: %v", pid.String())
 
-	// 将服务信息发布到etcd
+	// 将服务信息发布到集群
 	ev := event.NewEvent()
 	ev.Type = event.SysEventServiceReg
 	ev.Data = pid
 	em.IEventProcessor.EventHandler(ev)
 
-	return pid
+	return
 }
 
 func (em *EndpointManager) RemoveService(pid *actor.PID) {
@@ -136,7 +142,17 @@ func (em *EndpointManager) GetSender(pid *actor.PID) inf.IRpcSender {
 	cli := em.repository.SelectByServiceUid(pid.GetServiceUid())
 	if cli == nil {
 		// 只有一种情况下可能是空的,就是调用者是私有服务,那么此时就单独创建一个,放入临时仓库
-		return em.repository.AddTmp(client.NewTmpSender(def.DefaultRpcTypeRpcx, pid, nil))
+		return em.repository.AddTmp(client.NewTmpSender(def.RpcTypeRpcx, pid, nil))
 	}
 	return cli
+}
+
+func (em *EndpointManager) CreatePid(serverId int32, serviceId, serviceType, serviceName string, version int64, rpcType string) *actor.PID {
+	rt, ok := em.remotes[rpcType]
+	if !ok {
+		log.SysLogger.Errorf("not found rpc type: %s", rpcType)
+		return nil
+	}
+
+	return actor.NewPID(rt.GetAddress(), em.nodeUid, serverId, serviceId, serviceType, serviceName, version, rpcType)
 }

@@ -31,7 +31,7 @@ type NodeConf struct {
 
 type ClusterConf struct {
 	ETCDConf       *ETCDConf          `binding:"required"` // etcd配置
-	RPCServer      *RPCServer         `binding:""`         // rpc服务配置
+	RPCServers     []*RPCServer       `binding:""`         // rpc服务配置
 	RemoteType     string             `binding:""`         // 远程服务类型(默认rpcx)
 	DiscoveryType  string             `binding:""`         // 服务发现类型(默认etcd)
 	RemoteConfPath string             `binding:""`         // 远程配置路径(开启了远程配置才会使用,且必须配置etcd)
@@ -55,16 +55,18 @@ type ETCDConf struct {
 type RPCServer struct {
 	Addr   string // rpc监听地址
 	Protoc string // 协议
+	Type   string // 服务类型(默认grpc)
 }
 
 type ServiceInitConf struct {
-	ServiceName  string // 服务名称
-	Type         string // 服务类型
-	ServerId     int32  // 服务ID
-	TimerSize    int    // 定时器数量
-	MailBoxSize  int    // 事件队列数量
-	GoroutineNum int32  // 协程数量
-	RpcType      string // 远程调用方式(默认使用rpcx)
+	ServiceId    string `binding:""`         // 服务唯一id(如果是全局唯一的服务,且不会启动多个,那么可以为空)
+	ServiceName  string `binding:"required"` // 服务名称
+	Type         string `binding:"required"` // 服务类型
+	ServerId     int32  `binding:"required"` // 服务ID
+	TimerSize    int    `binding:""`         // 定时器数量
+	MailBoxSize  int    `binding:""`         // 事件队列数量
+	GoroutineNum int32  `binding:""`         // 协程数量
+	RpcType      string `binding:""`         // 远程调用方式(默认使用rpcx)
 }
 
 type ServiceConfig struct {

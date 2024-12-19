@@ -21,6 +21,9 @@ import (
 	"time"
 )
 
+// TODO 这里有个东西可以优化,就是如果是cast消息,那么可以预先将消息创建好,避免每个客户端都重新封装一遍
+// 但是需要考虑到如果是不同的连接方式,可能消息格式不同,需要做兼容处理
+
 type MessageBus struct {
 	dto.DataRef
 	sender   inf.IRpcSender
@@ -50,8 +53,11 @@ func ReleaseMessageBus(mb *MessageBus) {
 }
 
 func (mb *MessageBus) call(method string, timeout time.Duration, in, out interface{}) error {
-	if mb.sender == nil || mb.receiver == nil {
-		return fmt.Errorf("sender or receiver is nil")
+	if mb.sender == nil {
+		return fmt.Errorf("sender is nil")
+	}
+	if mb.receiver == nil {
+		return fmt.Errorf("receiver is nil")
 	}
 	if mb.err != nil {
 		// 这里可能是从MultiBus中产生的

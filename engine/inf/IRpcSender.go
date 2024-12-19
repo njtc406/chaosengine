@@ -7,8 +7,6 @@ package inf
 
 import "github.com/njtc406/chaosengine/engine/actor"
 
-// TODO 在sender加入一个create方法,根据不同的pid参数来创建不同的sender,这样可以直接扩展出不同方式的sender
-
 type IRpcSender interface {
 	IRpcHandler
 	IRpcSenderHandler

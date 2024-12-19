@@ -76,30 +76,45 @@ func (r *Repository) Select(sender *actor.PID, serverId int32, serviceId, servic
 	return r.SelectBySvcUid(sender, serviceUid)
 }
 
-func (r *Repository) SelectByServiceType(sender *actor.PID, serverId int32, nodeType, serviceName string) inf.IBus {
+func (r *Repository) SelectByServiceType(sender *actor.PID, serverId int32, serviceType, serviceName string) inf.IBus {
+	if serviceType == "" && serviceName == "" {
+		return messagebus.MultiBus{}
+	}
 	r.mapNodeLock.RLock()
 	defer r.mapNodeLock.RUnlock()
 
 	var list messagebus.MultiBus
-	nameUidMap, ok := r.mapSvcBySTpAndSName[nodeType]
-	if !ok {
-		return list
-	}
-
 	var serviceList []string
-	if serviceName == "" {
-		for _, uidMap := range nameUidMap {
+	if serviceType == "" {
+		for _, nameUidMap := range r.mapSvcBySTpAndSName {
+			uidMap, ok := nameUidMap[serviceName] // serviceType 和 serviceName不能同时为空,所以这里必定有serviceName
+			if !ok {
+				continue
+			}
 			for serviceUid := range uidMap {
 				serviceList = append(serviceList, serviceUid)
 			}
 		}
 	} else {
-		uidMap, ok := nameUidMap[serviceName]
+		nameUidMap, ok := r.mapSvcBySTpAndSName[serviceType]
 		if !ok {
 			return list
 		}
-		for serviceUid := range uidMap {
-			serviceList = append(serviceList, serviceUid)
+
+		if serviceName == "" {
+			for _, uidMap := range nameUidMap {
+				for serviceUid := range uidMap {
+					serviceList = append(serviceList, serviceUid)
+				}
+			}
+		} else {
+			uidMap, ok := nameUidMap[serviceName]
+			if !ok {
+				return list
+			}
+			for serviceUid := range uidMap {
+				serviceList = append(serviceList, serviceUid)
+			}
 		}
 	}
 

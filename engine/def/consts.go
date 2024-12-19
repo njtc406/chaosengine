@@ -45,8 +45,9 @@ const (
 )
 
 const (
-	DefaultRpcTypeLocal = "local"
-	DefaultRpcTypeRpcx  = "rpcx"
+	RpcTypeLocal = "local"
+	RpcTypeRpcx  = "rpcx"
+	RpcTypeGrpc  = "grpc"
 )
 
 const (
