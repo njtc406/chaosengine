@@ -10,6 +10,7 @@ import (
 
 // Select 选择服务
 func (h *Handler) Select(serverId int32, serviceId, serviceName string) inf.IBus {
+	log.SysLogger.Debugf("pid:%s", h.GetPid().String())
 	return endpoints.GetEndpointManager().Select(h.GetPid(), serverId, serviceId, serviceName)
 }
 

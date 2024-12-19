@@ -31,7 +31,7 @@ type NodeConf struct {
 
 type ClusterConf struct {
 	ETCDConf       *ETCDConf          `binding:"required"` // etcd配置
-	RPCServer      *RPCServer         `binding:""`         // rpc服务配置
+	RPCServers     []*RPCServer       `binding:""`         // rpc服务配置
 	RemoteType     string             `binding:""`         // 远程服务类型(默认rpcx)
 	DiscoveryType  string             `binding:""`         // 服务发现类型(默认etcd)
 	RemoteConfPath string             `binding:""`         // 远程配置路径(开启了远程配置才会使用,且必须配置etcd)
@@ -55,6 +55,7 @@ type ETCDConf struct {
 type RPCServer struct {
 	Addr   string // rpc监听地址
 	Protoc string // 协议
+	Type   string // 服务类型(默认grpc)
 }
 
 type ServiceInitConf struct {

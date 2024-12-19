@@ -53,8 +53,11 @@ func ReleaseMessageBus(mb *MessageBus) {
 }
 
 func (mb *MessageBus) call(method string, timeout time.Duration, in, out interface{}) error {
-	if mb.sender == nil || mb.receiver == nil {
-		return fmt.Errorf("sender or receiver is nil")
+	if mb.sender == nil {
+		return fmt.Errorf("sender is nil")
+	}
+	if mb.receiver == nil {
+		return fmt.Errorf("receiver is nil")
 	}
 	if mb.err != nil {
 		// 这里可能是从MultiBus中产生的

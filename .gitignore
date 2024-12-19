@@ -14,5 +14,4 @@
 # vendor/
 .idea
 /example/cache
-/data/
-/cache/
+/example/data

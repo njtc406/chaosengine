@@ -51,25 +51,26 @@ type Service struct {
 	eventProcessor inf.IEventProcessor // 事件管理器
 }
 
-func (s *Service) fixConf(serviceInitConf *config.ServiceInitConf) {
+func (s *Service) fixConf(serviceInitConf *config.ServiceInitConf) *config.ServiceInitConf {
 	if serviceInitConf == nil {
 		serviceInitConf = &config.ServiceInitConf{
+			ServiceId:    "",
 			ServiceName:  "",
 			Type:         "Normal",
 			ServerId:     0,
 			TimerSize:    def.DefaultTimerSize,
 			MailBoxSize:  def.DefaultMailBoxSize,
 			GoroutineNum: def.DefaultGoroutineNum,
-			RpcType:      def.DefaultRpcTypeRpcx,
+			RpcType:      def.RpcTypeRpcx,
 		}
-		return
+		return serviceInitConf
 	}
 
 	if serviceInitConf.Type == "" {
 		serviceInitConf.Type = "Normal"
 	}
 	if serviceInitConf.RpcType == "" {
-		serviceInitConf.RpcType = def.DefaultRpcTypeRpcx
+		serviceInitConf.RpcType = def.RpcTypeRpcx
 	}
 	if serviceInitConf.TimerSize == 0 {
 		serviceInitConf.TimerSize = def.DefaultTimerSize
@@ -80,6 +81,8 @@ func (s *Service) fixConf(serviceInitConf *config.ServiceInitConf) {
 	if serviceInitConf.GoroutineNum == 0 {
 		serviceInitConf.GoroutineNum = def.DefaultGoroutineNum
 	}
+
+	return serviceInitConf
 }
 
 func (s *Service) Init(svc interface{}, serviceInitConf *config.ServiceInitConf, cfg interface{}) {
@@ -87,8 +90,8 @@ func (s *Service) Init(svc interface{}, serviceInitConf *config.ServiceInitConf,
 		return
 	}
 	// 整理配置参数
-	s.fixConf(serviceInitConf)
-	log.SysLogger.Debugf("service[%s] init conf: %+v", s.GetName(), serviceInitConf)
+	serviceInitConf = s.fixConf(serviceInitConf)
+	//log.SysLogger.Debugf("service[%s] init conf: %+v", s.GetName(), serviceInitConf)
 	// 初始化服务数据
 	s.id = serviceInitConf.ServiceId
 	s.serviceType = serviceInitConf.Type
@@ -121,6 +124,7 @@ func (s *Service) Init(svc interface{}, serviceInitConf *config.ServiceInitConf,
 	s.eventHandler = event.NewHandler()
 	s.eventHandler.Init(s.eventProcessor)
 	s.IConcurrent = concurrent.NewConcurrent()
+	s.pid = endpoints.GetEndpointManager().CreatePid(s.serverId, s.id, s.serviceType, s.name, s.version, s.rpcType)
 
 	if err := s.src.OnInit(); err != nil {
 		log.SysLogger.Panicf("service[%s] onInit error: %s", s.GetName(), err)
@@ -132,11 +136,12 @@ func (s *Service) Start() error {
 	if !atomic.CompareAndSwapInt32(&s.status, def.SvcStatusInit, def.SvcStatusStarting) {
 		return fmt.Errorf("service[%s] status[%d] has inited", s.GetName(), s.status)
 	}
-	var waitRun sync.WaitGroup
 
 	if err := s.src.OnStart(); err != nil {
 		return err
 	}
+
+	var waitRun sync.WaitGroup
 	for i := int32(0); i < s.goroutineNum; i++ {
 		s.wg.Add(1)
 		waitRun.Add(1)
@@ -145,16 +150,16 @@ func (s *Service) Start() error {
 			s.run()
 		})
 	}
-
 	waitRun.Wait()
 
 	// 所有服务都注册到服务列表
-	s.pid = endpoints.GetEndpointManager().AddService(s.serverId, s.id, s.serviceType, s.name, s.version, s.rpcType, s.GetRpcHandler())
+	endpoints.GetEndpointManager().AddService(s.pid, s.GetRpcHandler())
 	log.SysLogger.Infof(" service[%s] pid: %s", s.GetName(), s.pid.String())
 	return nil
 }
 
 func (s *Service) run() {
+	// TODO 这里之后增加一个mpse模式的消息处理
 	defer s.wg.Done()
 
 	var bStop bool

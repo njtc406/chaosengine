@@ -133,11 +133,13 @@ func setDefaultValues() {
 			UserName:    "",
 			Password:    "",
 		},
-		RPCServer: &RPCServer{
-			Addr:   "0.0.0.0:6688",
-			Protoc: "tcp",
+		RPCServers: []*RPCServer{
+			{
+				Addr:   "0.0.0.0:6688",
+				Protoc: "tcp",
+				Type:   def.RpcTypeGrpc,
+			},
 		},
-		RemoteType:     def.DefaultRpcTypeRpcx,
 		DiscoveryType:  def.DiscoveryConfUseLocal,
 		RemoteConfPath: "",
 	})

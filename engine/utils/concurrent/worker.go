@@ -49,7 +49,9 @@ func (w *worker) exec(t *task) {
 		if r := recover(); r != nil {
 			cb := t.cb
 			t.cb = func(err error) {
-				cb(r.(error))
+				if cb != nil {
+					cb(r.(error))
+				}
 			}
 			log.SysLogger.Errorf("errdef:%s\ntrace:%s", r, debug.Stack())
 			w.endCallFun(true, t)

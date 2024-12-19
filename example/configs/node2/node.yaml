@@ -5,9 +5,9 @@ NodeConf:
   # 系统状态(debug/release)
   SystemStatus: debug
   # 系统数据目录(持久化)
-  PVCPath: ./data
+  PVCPath: ./example/data
   # 系统缓存目录
-  PVPath: ./cache
+  PVPath: ./example/cache
   # 性能监控(0表示不开启监控)
   ProfilerInterval: 10s
   # 线程池大小
@@ -24,11 +24,16 @@ ClusterConf:
     UserName: root
     # etcd密码
     Password: 123456
-  RPCServer:
+  RPCServers:
     # 监听地址
-    Addr: 0.0.0.0:6689
-    # 协议
-    Protoc: "tcp"
+    - Addr: 0.0.0.0:6620
+      # 协议
+      Protoc: "tcp"
+      # rpc类型
+      Type: "rpcx"
+    - Addr: 0.0.0.0:6621
+      Protoc: "tcp"
+      Type: "grpc"
   RemoteType: rpcx
   DiscoveryType: etcd
   RemoteConfPath: ""
@@ -54,10 +59,11 @@ ServiceConf:
       MailBoxSize: 1000
       # 协程数量
       GoroutineNum: 1
+      RpcType: "rpcx"
 
 # 日志配置
 SystemLogger:
-  Path: ./data/logs
+  Path: ./example/data/logs
   # 日志文件名
   Name: "system"
   # 日志级别

@@ -327,14 +327,14 @@ var count int
 
 func NewMsgEnvelope() *MsgEnvelope {
 	count++
-	log.SysLogger.Infof(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>msgEnvelopePool.Get() count: %d", count)
+	//log.SysLogger.Infof(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>msgEnvelopePool.Get() count: %d", count)
 	return msgEnvelopePool.Get().(*MsgEnvelope)
 }
 
 func ReleaseMsgEnvelope(envelope inf.IEnvelope) {
 	if envelope != nil {
 		count--
-		log.SysLogger.Infof("<<<<<<<<<<<<<<<<<<<<<<<<<<<msgEnvelopePool.Put() count: %d", count)
+		//log.SysLogger.Infof("<<<<<<<<<<<<<<<<<<<<<<<<<<<msgEnvelopePool.Put() count: %d", count)
 		msgEnvelopePool.Put(envelope.(*MsgEnvelope))
 	}
 }
